@@ -1,0 +1,137 @@
+# Editable skill kit example (Barrier Healer archetype - fully data-driven, easy to update for 8.0+)
+label: "Example Barrier Healer (2.48s GCD, PIE 800, 1 Raise Reserve)"
+role: healer
+gcd_s: 2.48
+base_weave_slots_per_gcd: 1
+burst_interval_s: 120.0
+burst_duration_s: 20.0
+burst_offset_s: 5.0
+burst_weave_slots_per_gcd: 1
+max_hp_party: 120000
+max_hp_tank: 190000
+
+gear_stats:
+  piety: 800                       # Combat MP regen bonus
+  determination: 2200
+  spell_or_skill_speed: 600
+  heal_scale_multiplier: 1.0
+  filler_gcd_mp_cost: 400.0        # Baseline attack GCD MP drain (400 MP / 2.48s ~= 161 MP/s)
+  lucid_dreaming_mp_per_sec: 64.2  # Lucid Dreaming used on CD (3850 MP / 60s)
+  raise_mp_cost: 2400.0
+  planned_raise_reserve: 1         # Keep >= 2400 MP reserved for emergency Raise
+
+resources:
+  - name: mp
+    initial: 10000
+    maximum: 10000
+    regen_per_sec: 66.7
+  - name: gauge
+    initial: 3
+    maximum: 3
+    regen_per_sec: 0.05   # 1 stack every 20s
+
+skills:
+  - id: mit_10_hot
+    name: "ケーラコレ (例: 10%軽減+HoT)"
+    action_id: 24298
+    cooldown_s: 30.0
+    duration_s: 15.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: party
+    mitigation_all: 0.10
+    heal_hot_total: 18000
+    resource_costs:
+      gauge: 1
+    resource_grants:
+      mp: 700
+    lead_time_s: 2.0
+    dps_cost: 0.05
+
+  - id: mit_10_shield
+    name: "パンハイマ / 陣系 (例: 10%軽減+多段バリア)"
+    action_id: 24311
+    cooldown_s: 120.0
+    duration_s: 15.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: party
+    mitigation_all: 0.10
+    shield_value: 26000
+    lead_time_s: 2.5
+    dps_cost: 0.12
+
+  - id: holos_style
+    name: "ホーリズム (例: 10%軽減+バリア+戻し)"
+    action_id: 24310
+    cooldown_s: 120.0
+    duration_s: 20.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: party
+    mitigation_all: 0.10
+    shield_value: 16000
+    heal_instant: 15000
+    lead_time_s: 2.5
+    dps_cost: 0.14
+
+  - id: ogcd_aoe_heal
+    name: "イックソコレ (例: 即時範囲戻し)"
+    action_id: 24299
+    cooldown_s: 30.0
+    duration_s: 0.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: party
+    heal_instant: 20000
+    resource_costs:
+      gauge: 1
+    resource_grants:
+      mp: 700
+    lead_time_s: 0.5
+    dps_cost: 0.04
+
+  - id: ogcd_hot
+    name: "ピュシスII (例: 範囲HoT+回復効果UP)"
+    action_id: 24302
+    cooldown_s: 60.0
+    duration_s: 15.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: party
+    heal_hot_total: 24000
+    lead_time_s: 1.0
+    dps_cost: 0.04
+
+  - id: tank_single_mit
+    name: "タウロコレ (例: 単体10%軽減+戻し)"
+    action_id: 24303
+    cooldown_s: 45.0
+    duration_s: 15.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: single_ally
+    mitigation_all: 0.10
+    heal_instant: 32000
+    resource_costs:
+      gauge: 1
+    resource_grants:
+      mp: 700
+    lead_time_s: 2.0
+    dps_cost: 0.06
+
+  - id: gcd_party_shield
+    name: "エウクラシア・プログノシスII (例: GCD範囲バリア)"
+    action_id: 37034
+    cooldown_s: 2.5
+    duration_s: 30.0
+    cast_time_s: 0.0
+    is_gcd: true
+    weave_cost: 0
+    target_scope: party
+    shield_value: 19000
+    heal_instant: 6000
+    resource_costs:
+      mp: 900
+    lead_time_s: 3.0
+    dps_cost: 1.00

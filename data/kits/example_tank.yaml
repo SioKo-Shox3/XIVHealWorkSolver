@@ -1,0 +1,81 @@
+# Editable skill kit example (Tank archetype - fully data-driven, easy to update for 8.0+)
+label: "Example Tank MT (2.50s GCD, TEN 1400)"
+role: tank
+player_is_mt: true
+gcd_s: 2.50
+base_weave_slots_per_gcd: 2
+burst_interval_s: 120.0
+burst_duration_s: 20.0
+burst_offset_s: 5.0
+burst_weave_slots_per_gcd: 1
+max_hp_party: 120000
+max_hp_tank: 190000
+
+gear_stats:
+  tenacity: 1400          # Passive ~3.9% damage reduction on self-targeted tank hits
+  determination: 2100
+  spell_or_skill_speed: 420
+  heal_scale_multiplier: 1.0
+
+resources: []
+
+skills:
+  - id: reprisal
+    name: "リプライザル"
+    action_id: 7535
+    cooldown_s: 60.0
+    duration_s: 15.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: boss_debuff
+    mitigation_all: 0.10
+    stack_group: reprisal
+    lead_time_s: 2.0
+    dps_cost: 0.03
+
+  - id: party_mit_90
+    name: "全体軽減90s (例: ミッショナリー/ハート・オブ・ライト/ヴェール/シェイクオフ)"
+    cooldown_s: 90.0
+    duration_s: 15.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: party
+    mitigation_magical: 0.10
+    mitigation_physical: 0.05
+    lead_time_s: 2.0
+    dps_cost: 0.06
+
+  - id: rampart
+    name: "ランパート"
+    action_id: 7531
+    cooldown_s: 90.0
+    duration_s: 20.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: self
+    mitigation_all: 0.20
+    lead_time_s: 2.5
+    dps_cost: 0.08
+
+  - id: big_mit_120
+    name: "120s大バフ (例: 40%軽減)"
+    cooldown_s: 120.0
+    duration_s: 15.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: self
+    mitigation_all: 0.40
+    lead_time_s: 2.5
+    dps_cost: 0.12
+
+  - id: short_mit_25
+    name: "短バフ25s (例: 15%+15%軽減/バリア)"
+    cooldown_s: 25.0
+    duration_s: 8.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: single_ally
+    mitigation_all: 0.22
+    shield_value: 15000
+    lead_time_s: 1.5
+    dps_cost: 0.03

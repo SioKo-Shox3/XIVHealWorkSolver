@@ -1,0 +1,160 @@
+# Synthetic 3-minute Savage-style encounter timeline for demo & RL training
+encounter_name: "Example Savage Encounter (3min Demo)"
+zone_name: "Demo Tier"
+duration_s: 185.0
+
+movement_windows:
+  - start_s: 45.0
+    end_s: 58.0
+    name: "移動ギミック1（詠唱困難区間）"
+    cast_interrupt_prob: 0.90
+  - start_s: 126.0
+    end_s: 138.0
+    name: "2分バースト＋散開移動"
+    cast_interrupt_prob: 0.85
+
+downtime_windows: []
+
+auto_attacks:
+  - start_s: 3.0
+    end_s: 45.0
+    target: mt
+    damage_type: physical
+    raw_damage_per_hit: 22000
+    interval_s: 3.0
+  - start_s: 58.0
+    end_s: 126.0
+    target: mt
+    damage_type: physical
+    raw_damage_per_hit: 24000
+    interval_s: 3.0
+  - start_s: 138.0
+    end_s: 185.0
+    target: st
+    damage_type: physical
+    raw_damage_per_hit: 24000
+    interval_s: 3.0
+
+events:
+  - id: e1_opener_raidwide
+    time_s: 12.0
+    name: "開幕全体魔法"
+    damage_type: magical
+    target_scope: party
+    raw_damage: 118000
+    requires_movement: false
+
+  - id: e2_tankbuster
+    time_s: 28.0
+    name: "タンク強攻撃1"
+    damage_type: physical
+    target_scope: mt
+    raw_damage: 215000
+    requires_movement: false
+
+  - id: e3_stack_bleed
+    time_s: 52.0
+    name: "移動ギミック＋全体DoT"
+    damage_type: magical
+    target_scope: party
+    raw_damage: 128000
+    dot_total_damage: 32000
+    requires_movement: true
+
+  - id: e4_multi_hit
+    time_s: 86.0
+    name: "連続全体攻撃(5連)"
+    damage_type: magical
+    target_scope: party
+    raw_damage: 148000
+    hit_count: 5
+    requires_movement: false
+
+  - id: e5_tankbuster2
+    time_s: 112.0
+    name: "タンク強攻撃2"
+    damage_type: physical
+    target_scope: mt
+    raw_damage: 225000
+    requires_movement: false
+
+  - id: e6_burst_raidwide
+    time_s: 132.0
+    name: "2分バースト中全体"
+    damage_type: magical
+    target_scope: party
+    raw_damage: 134000
+    requires_movement: true
+
+  - id: e7_finale_raidwide
+    time_s: 168.0
+    name: "終盤大全体攻撃"
+    damage_type: magical
+    target_scope: party
+    raw_damage: 152000
+    requires_movement: false
+
+# Simulated partner/party tendencies (as would be learned from FFLogs)
+partner_profile:
+  - event_id: e1_opener_raidwide
+    skill_name: "リプライザル (Tank)"
+    source_role: tank
+    stack_group: reprisal
+    mitigation_all: 0.10
+    probability: 0.90
+    timing_std_s: 0.8
+    sample_count: 20
+
+  - event_id: e3_stack_bleed
+    skill_name: "テンパランス / 運命の輪 (Co-Healer)"
+    source_role: healer
+    mitigation_all: 0.10
+    heal_value: 20000
+    probability: 0.75
+    timing_std_s: 1.2
+    sample_count: 20
+
+  - event_id: e4_multi_hit
+    skill_name: "リプライザル (Tank)"
+    source_role: tank
+    stack_group: reprisal
+    mitigation_all: 0.10
+    probability: 0.85
+    timing_std_s: 0.7
+    sample_count: 20
+
+  - event_id: e4_multi_hit
+    skill_name: "アサイラム / アーサリー (Co-Healer)"
+    source_role: healer
+    heal_value: 28000
+    probability: 0.80
+    timing_std_s: 1.5
+    sample_count: 20
+
+  - event_id: e6_burst_raidwide
+    skill_name: "アドル (Caster)"
+    source_role: dps
+    stack_group: addle
+    mitigation_magical: 0.10
+    mitigation_physical: 0.05
+    probability: 0.55
+    timing_std_s: 1.5
+    sample_count: 20
+
+  - event_id: e7_finale_raidwide
+    skill_name: "リプライザル (Tank)"
+    source_role: tank
+    stack_group: reprisal
+    mitigation_all: 0.10
+    probability: 0.80
+    timing_std_s: 0.9
+    sample_count: 20
+
+  - event_id: e7_finale_raidwide
+    skill_name: "相方大軽減 (Co-Healer)"
+    source_role: healer
+    mitigation_all: 0.10
+    heal_value: 24000
+    probability: 0.65
+    timing_std_s: 1.2
+    sample_count: 20
