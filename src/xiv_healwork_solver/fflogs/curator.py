@@ -53,12 +53,14 @@ def evaluate_fight_quality(
     combined_rdps = sum(float(h.get("rdps", 0.0)) for h in healers)
     total_eff_heal = sum(max(0.0, float(h.get("effective_healing", 0.0))) for h in healers)
     shares: dict[str, float] = {}
+    overheals: dict[str, float] = {}
 
     if len(healers) >= 2:
         # Always enforce overheal checks regardless of total_eff_heal
         for h in healers:
             name = str(h.get("name", "unknown"))
             overheal = float(h.get("overheal_pct", 0.0))
+            overheals[name] = round(overheal, 1)
             if overheal > cfg.max_overheal_pct:
                 reasons.append(f"excessive_overheal ({name} {overheal:.1f}% > {cfg.max_overheal_pct:.1f}%)")
         if total_eff_heal <= 0:
@@ -78,12 +80,14 @@ def evaluate_fight_quality(
     if mit_per_min < cfg.min_party_mit_casts_per_min:
         reasons.append(f"low_mit_activity ({mit_per_min:.2f}/min < {cfg.min_party_mit_casts_per_min:.2f}/min)")
 
-    # Higher score = higher combined healer rDPS, closer to 50/50 heal balance, strong mitigation cadence
+    # Higher score = higher combined healer rDPS, closer to 50/50 heal balance, LOW overheal, strong mitigation
     balance_bonus = 1.0
     if shares:
         max_dev = max(abs(s - 0.5) for s in shares.values())
         balance_bonus = max(0.5, 1.0 - max_dev)
-    quality_score = round((combined_rdps / 1000.0) * balance_bonus + min(4.0, mit_per_min) * 2.0, 2)
+    mean_oh = (sum(overheals.values()) / len(overheals)) if overheals else 50.0
+    oh_efficiency = max(0.4, 1.0 - (mean_oh / 100.0) * 0.6)
+    quality_score = round((combined_rdps / 1000.0) * balance_bonus * oh_efficiency + min(4.0, mit_per_min) * 2.0, 2)
 
     return LogQualityReport(
         report_code=str(candidate["report_code"]),
@@ -94,6 +98,7 @@ def evaluate_fight_quality(
         deaths=deaths,
         combined_healer_rdps=round(combined_rdps, 1),
         healer_effective_shares=shares,
+        healer_overheal_pcts=overheals,
         party_mit_casts_per_min=round(mit_per_min, 2),
         quality_score=quality_score,
     )

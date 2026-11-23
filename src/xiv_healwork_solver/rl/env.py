@@ -14,17 +14,22 @@ from typing import Any
 
 import numpy as np
 
-from xiv_healwork_solver.models import EncounterTimeline, PlayerKit
+from xiv_healwork_solver.models import EncounterTimeline, GearSamplingRange, PlayerKit
 from xiv_healwork_solver.sim.engine import EPS, ActionEntry, CombatEngine, build_action_entries
 
 LOOKAHEAD_EVENTS = 8
-STATE_DIM = 30
+STATE_DIM = 32
 SKILL_FEAT_DIM = 20
 EVENT_FEAT_DIM = 14
 
 
 class FF14HealMitEnv:
-    """Gym-style RL environment backed directly by CombatEngine (zero duplicated combat rules)."""
+    """Gym-style RL environment backed directly by CombatEngine (zero duplicated combat rules).
+
+    Supports gear-conditioned training via `gear_sampling`: each training episode samples
+    (gcd_s, piety, tenacity, heal_scale, max_hp) and exposes those exact parameters in `obs["state"]`,
+    so a single trained checkpoint adapts at inference time to any user gear input.
+    """
 
     def __init__(
         self,
@@ -35,11 +40,19 @@ class FF14HealMitEnv:
         tank_passive_self_heal_per_tick: float = 0.0,
         partner_trust_scale: float = 1.0,
         max_wait_s: float = 1.0,
+        gear_sampling: GearSamplingRange | None = None,
         seed: int | None = None,
     ) -> None:
+        self.base_kit = kit
         self.kit = kit
         self.timeline = timeline
+        self.damage_variance = damage_variance
+        self.raise_prob_per_pull = raise_prob_per_pull
+        self.tank_passive_self_heal_per_tick = tank_passive_self_heal_per_tick
+        self.partner_trust_scale = partner_trust_scale
         self.max_wait_s = max_wait_s
+        self.gear_sampling = gear_sampling
+        self._gear_rng = np.random.default_rng(seed)
         self.engine = CombatEngine(
             kit=kit,
             timeline=timeline,
@@ -105,12 +118,52 @@ class FF14HealMitEnv:
             feats[i, 19] = 1.0 if sk.needs_boss_target() else 0.0
         return feats
 
+    def _sample_gear_kit(self) -> PlayerKit:
+        assert self.gear_sampling is not None
+        gs = self.gear_sampling
+        kit_copy = self.base_kit.model_copy(deep=True)
+        kit_copy.gcd_s = round(float(self._gear_rng.uniform(gs.gcd_min, gs.gcd_max)), 2)
+        kit_copy.gear_stats.piety = int(self._gear_rng.integers(gs.piety_min, gs.piety_max + 1))
+        kit_copy.gear_stats.tenacity = int(self._gear_rng.integers(gs.tenacity_min, gs.tenacity_max + 1))
+        kit_copy.gear_stats.heal_scale_multiplier = round(
+            float(self._gear_rng.uniform(gs.heal_scale_min, gs.heal_scale_max)), 3
+        )
+        hp_scale = float(self._gear_rng.uniform(gs.hp_scale_min, gs.hp_scale_max))
+        kit_copy.max_hp_party = round(self.base_kit.max_hp_party * hp_scale, 0)
+        kit_copy.max_hp_tank = round(self.base_kit.max_hp_tank * hp_scale, 0)
+        return kit_copy
+
     def reset(
         self,
         seed: int | None = None,
         deterministic: bool = False,
         fixed_tick_phase: float | None = None,
     ) -> dict[str, np.ndarray]:
+        if self.gear_sampling is not None and not deterministic:
+            self.kit = self._sample_gear_kit()
+            self.engine = CombatEngine(
+                kit=self.kit,
+                timeline=self.timeline,
+                damage_variance=self.damage_variance,
+                raise_prob_per_pull=self.raise_prob_per_pull,
+                partner_trust_scale=self.partner_trust_scale,
+                tank_passive_self_heal_per_tick=self.tank_passive_self_heal_per_tick,
+                seed=seed,
+            )
+            self._static_skill_feats = self._build_static_skill_feats()
+        else:
+            if self.kit is not self.base_kit:
+                self.kit = self.base_kit
+                self.engine = CombatEngine(
+                    kit=self.kit,
+                    timeline=self.timeline,
+                    damage_variance=self.damage_variance,
+                    raise_prob_per_pull=self.raise_prob_per_pull,
+                    partner_trust_scale=self.partner_trust_scale,
+                    tank_passive_self_heal_per_tick=self.tank_passive_self_heal_per_tick,
+                    seed=seed,
+                )
+                self._static_skill_feats = self._build_static_skill_feats()
         self.engine.reset(seed=seed, deterministic=deterministic, fixed_tick_phase=fixed_tick_phase)
         return self._get_obs()
 
@@ -196,6 +249,9 @@ class FF14HealMitEnv:
         state[28] = min(1.0, active_dot / 20_000.0)
         aa_active = any(seg.start_s <= t <= seg.end_s for seg in self.timeline.auto_attacks) and self.timeline.is_boss_targetable(t)
         state[29] = 1.0 if aa_active else 0.0
+        # Explicit gear parameter channels (heal scale & normalized party max HP)
+        state[30] = min(2.0, self.kit.gear_stats.heal_scale_multiplier)
+        state[31] = min(2.0, self.kit.max_hp_party / 170_000.0)
 
         skill_tokens = self._static_skill_feats.copy()
         for entry in self.actions[2:]:

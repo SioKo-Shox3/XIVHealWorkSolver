@@ -22,6 +22,13 @@ gear_stats:
   raise_mp_cost: 2400.0
   planned_raise_reserve: 1         # Keep >= 2400 MP reserved for emergency Resurrection
 
+prepull_actions:
+  - skill_id: deployment_tactics
+    offset_s: -3.0                 # Pre-pull Recitation + Protraction + Adlo -> Deploy (~72k party shield!)
+    target_channel: party
+    override_shield_value: 72000
+    consumes_cooldown: true
+
 resources:
   - name: mp
     initial: 10000

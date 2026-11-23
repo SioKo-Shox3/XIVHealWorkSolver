@@ -12,9 +12,15 @@ from xiv_healwork_solver.fflogs.extractor import (
     extract_damage_timeline,
     extract_partner_probabilities,
 )
-from xiv_healwork_solver.models import EncounterTimeline, LogFilterConfig, LogQualityReport
+from xiv_healwork_solver.models import (
+    EncounterTimeline,
+    LogFilterConfig,
+    LogQualityReport,
+    PartnerBaselineHealing,
+)
 
 HEALER_SPECS = {"WhiteMage", "Scholar", "Astrologian", "Sage"}
+TANK_SPECS = {"Paladin", "Warrior", "DarkKnight", "Gunbreaker"}
 
 
 def load_known_party_skills(path: str | Path) -> dict[int, dict[str, Any]]:
@@ -58,6 +64,7 @@ def build_curated_encounter_timeline(
     # Fetch Summary + Healing tables to curate out Chad-healing / deaths / speedkills
     candidates: list[dict[str, Any]] = []
     rep_meta: dict[tuple[str, int], dict[str, Any]] = {}
+    healing_tables: dict[tuple[str, int], dict[str, Any]] = {}
     for r in unique_reps:
         code, fid = r["report_code"], r["fight_id"]
         try:
@@ -65,6 +72,7 @@ def build_curated_encounter_timeline(
             healing = c.get_fight_table(code, fid, "Healing")
         except Exception:
             continue
+        healing_tables[(code, fid)] = healing
         dur_s = float(summary.get("totalTime", r.get("duration_ms") or 0)) / 1000.0
         deaths = len(summary.get("deathEvents") or [])
 
@@ -177,4 +185,35 @@ def build_curated_encounter_timeline(
         exclude_actor_names=exclude_names,
     )
     timeline.partner_profile = partner_probs
+
+    # Estimate co-healer & tank baseline effective healing per 3s tick from cached Healing tables!
+    cohealer_party_ticks: list[float] = []
+    mt_self_ticks: list[float] = []
+    st_self_ticks: list[float] = []
+    for rep in selected:
+        ht = healing_tables.get((rep.report_code, rep.fight_id)) or {}
+        dur_s = max(1.0, rep.duration_s)
+        co_eff = 0.0
+        tank_effs: list[float] = []
+        for e in (ht.get("entries") or []):
+            spec = str(e.get("type", ""))
+            eff = float(e.get("total") or 0.0)
+            if spec in HEALER_SPECS and spec.lower() != target_spec.lower():
+                co_eff += eff
+            elif spec in TANK_SPECS:
+                tank_effs.append(eff)
+        # Co-healer effective healing spread across 8 party members (net ~75% after big CDs already in partner_profile)
+        if co_eff > 0:
+            cohealer_party_ticks.append((co_eff * 0.75 / 8.0) / dur_s * 3.0)
+        if tank_effs:
+            tank_effs.sort(reverse=True)
+            mt_self_ticks.append((tank_effs[0] / dur_s) * 3.0)
+            if len(tank_effs) >= 2:
+                st_self_ticks.append((tank_effs[1] / dur_s) * 3.0)
+
+    timeline.partner_baseline_healing = PartnerBaselineHealing(
+        party_per_3s_tick=round(sum(cohealer_party_ticks) / len(cohealer_party_ticks), 1) if cohealer_party_ticks else 0.0,
+        mt_per_3s_tick=round(sum(mt_self_ticks) / len(mt_self_ticks), 1) if mt_self_ticks else 0.0,
+        st_per_3s_tick=round(sum(st_self_ticks) / len(st_self_ticks), 1) if st_self_ticks else 0.0,
+    )
     return timeline, accepted, rejected

@@ -308,7 +308,30 @@ def solve_mitigation_plan(
             row.append(ct)
         cast_times.append(row)
 
-    # 1. Eligibility, cast-completion deadline, downtime boss lockouts, live cooldowns, and carryover
+    # Pre-pull cooldown lockouts and active pre-pull shields/buffs (when solving from t=0)
+    prepull_cd_ready: dict[str, float] = {}
+    prepull_buff_exp: dict[str, float] = {}
+    prepull_shields_by_ch: dict[str, list[tuple[float, float]]] = {"party": [], "mt": [], "st": []}
+    if start_time_s <= 1e-6 and kit.prepull_actions:
+        sk_by_id = {sk.id: sk for sk in skills}
+        for pp in kit.prepull_actions:
+            sk = sk_by_id.get(pp.skill_id)
+            if sk is None:
+                continue
+            if pp.consumes_cooldown and sk.cooldown_s > 0:
+                ready_t = pp.offset_s + sk.cooldown_s
+                if ready_t > 0:
+                    prepull_cd_ready[sk.id] = max(prepull_cd_ready.get(sk.id, 0.0), ready_t)
+            if sk.duration_s > 0 and pp.offset_s + sk.duration_s > 0:
+                prepull_buff_exp[sk.id] = max(prepull_buff_exp.get(sk.id, 0.0), pp.offset_s + sk.duration_s)
+            sh_amt = pp.override_shield_value if pp.override_shield_value is not None else sk.shield_value * heal_scale
+            sh_exp = pp.offset_s + sk.effective_shield_duration()
+            if sh_amt > 0 and sh_exp > 0:
+                chs = ("party", "mt", "st") if pp.target_channel == "party" else (pp.target_channel,)
+                for c in chs:
+                    prepull_shields_by_ch[c].append((sh_amt, sh_exp))
+
+    # 1. Eligibility, cast-completion deadline, downtime boss lockouts, live & pre-pull cooldowns, and carryover
     for e, ev in enumerate(events):
         snap_t = ev.effective_snapshot_time()
         for s, sk in enumerate(skills):
@@ -320,6 +343,8 @@ def solve_mitigation_plan(
                 eligible = False
             # Pre-hit mitigation/shield must finish casting BEFORE snapshot!
             if not _is_post_hit_skill(sk) and cast_t + sk.cast_time_s > snap_t + 1e-6:
+                eligible = False
+            if sk.id in prepull_cd_ready and cast_t < prepull_cd_ready[sk.id] - 1e-6:
                 eligible = False
             if not eligible:
                 model.Add(x[e][s] == 0)
@@ -333,6 +358,8 @@ def solve_mitigation_plan(
             if live_state is not None and sk.id in live_state.active_buffs_remaining:
                 if snap_t <= start_time_s + live_state.active_buffs_remaining[sk.id] + 1e-6:
                     pre_active = True
+            if sk.id in prepull_buff_exp and snap_t <= prepull_buff_exp[sk.id] + 1e-6:
+                pre_active = True
 
             if pre_active and eligible:
                 model.Add(active[e][s] == 1)
@@ -503,6 +530,7 @@ def solve_mitigation_plan(
     }
 
     prev_hp_var: dict[str, cp_model.IntVar | int] = dict(init_hp_by_ch)
+    prepull_shield_used_ch: set[str] = set()
     primary_hp_after_hit_vars: list[cp_model.IntVar] = []
     event_weave_budgets: list[int] = []
 
@@ -594,7 +622,15 @@ def solve_mitigation_plan(
                             int(round((sk.heal_hot_total * heal_scale) * (hot_ticks_land / hot_ticks_tot))) * x[e][s]
                         )
 
-            total_shield = (0 if ev.mechanic_effect == "set_hp_to_1" else int(round(p_shields))) + sum(shield_terms)
+            # Credit pre-pull shield once on the first event hitting this channel before expiry
+            pp_sh_val = 0
+            if ev.mechanic_effect != "set_hp_to_1" and ch not in prepull_shield_used_ch:
+                valid_pp = [amt for amt, exp in prepull_shields_by_ch[ch] if ev.time_s <= exp + 1e-6]
+                if valid_pp:
+                    pp_sh_val = int(round(sum(valid_pp)))
+                    prepull_shield_used_ch.add(ch)
+
+            total_shield = (0 if ev.mechanic_effect == "set_hp_to_1" else int(round(p_shields)) + pp_sh_val) + sum(shield_terms)
 
             # Pre-hit HP (capped at max_hp so pre-hit heals at full HP do NOT act as post-hit recovery!)
             hp_pre_raw = model.NewIntVar(0, max_hp * 3, f"hp_pre_raw_{e}_{ch}")
@@ -618,8 +654,12 @@ def solve_mitigation_plan(
             model.Add(hp_after_hit + surv_slack >= min_surv_hp)
             objective_terms.append(weights.survival_slack_weight * surv_slack)
 
-            # Post-hit recovery & DoT carried to next event
-            total_post_heal = int(round(p_heals)) + sum(post_heal_terms)
+            # Post-hit recovery & DoT carried to next event (includes partner baseline healing over dt_to_next)
+            pbh = timeline.partner_baseline_healing
+            ticks_between = int(max(0.0, dt_to_next) // 3.0)
+            base_tick_heal = pbh.party_per_3s_tick + (pbh.mt_per_3s_tick if ch == "mt" else (pbh.st_per_3s_tick if ch == "st" else 0.0))
+            partner_base_heal = int(round(base_tick_heal * ticks_between * partner_trust))
+            total_post_heal = int(round(p_heals)) + partner_base_heal + sum(post_heal_terms)
             hp_after_rec_raw = model.NewIntVar(-raw_dmg * 2, max_hp * 3, f"hp_rec_raw_{e}_{ch}")
             model.Add(hp_after_rec_raw == hp_after_hit - eff_dot + total_post_heal)
             hp_after_rec_lo = model.NewIntVar(1, max_hp * 3, f"hp_rec_lo_{e}_{ch}")

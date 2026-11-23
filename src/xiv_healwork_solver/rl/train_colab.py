@@ -18,7 +18,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from xiv_healwork_solver.models import EncounterTimeline, PlayerKit
+from xiv_healwork_solver.models import EncounterTimeline, GearSamplingRange, PlayerKit
 from xiv_healwork_solver.rl.env import FF14HealMitEnv
 from xiv_healwork_solver.rl.model import SkillAttentionActorCritic
 
@@ -64,6 +64,7 @@ def evaluate_policy(
     min_party: list[float] = []
     min_mt: list[float] = []
     min_st: list[float] = []
+    overheals: list[float] = []
     best_log: list[dict[str, Any]] = []
 
     for i in range(n_eval_pulls):
@@ -87,6 +88,9 @@ def evaluate_policy(
         min_party.append(s["min_party_hp_ratio"])
         min_mt.append(s["min_mt_hp_ratio"])
         min_st.append(s["min_st_hp_ratio"])
+        raw_h = s.get("player_heal_raw", 0.0)
+        eff_h = s.get("player_heal_eff", 0.0)
+        overheals.append(((raw_h - eff_h) / raw_h) * 100.0 if raw_h > 1e-6 else 0.0)
         if i == 0:
             best_log = list(env.action_log)
 
@@ -96,6 +100,7 @@ def evaluate_policy(
         "mean_reward": round(float(np.mean(rewards)), 2),
         "mean_filler_gcds": round(float(np.mean(fillers)), 1),
         "mean_gcd_heals": round(float(np.mean(gcd_heals)), 2),
+        "mean_overheal_pct": round(float(np.mean(overheals)), 1),
         "worst_party_hp_pct": round(float(np.min(min_party)) * 100.0, 1),
         "worst_mt_hp_pct": round(float(np.min(min_mt)) * 100.0, 1),
         "worst_st_hp_pct": round(float(np.min(min_st)) * 100.0, 1),
@@ -115,16 +120,21 @@ def train_masked_ppo(
     clip_coef: float = 0.2,
     ent_coef: float = 0.015,
     vf_coef: float = 0.5,
+    gear_conditioned: bool = True,
     seed: int = 42,
     out_dir: str | Path = "outputs/rl_run",
 ) -> dict[str, Any]:
-    """Train SkillAttentionActorCritic with Masked PPO on GPU (if available) or CPU."""
+    """Train gear-conditioned SkillAttentionActorCritic with Masked PPO on GPU/CPU."""
     torch.manual_seed(seed)
     np.random.seed(seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"[RL] Device: {device} | Kit: {kit.label} | Timeline: {timeline.encounter_name}")
+    gear_range = GearSamplingRange() if gear_conditioned else None
+    print(
+        f"[RL] Device: {device} | GearConditioned={gear_conditioned} | "
+        f"Kit: {kit.label} | Timeline: {timeline.encounter_name}"
+    )
 
-    env = FF14HealMitEnv(kit, timeline, seed=seed)
+    env = FF14HealMitEnv(kit, timeline, gear_sampling=gear_range, seed=seed)
     model = SkillAttentionActorCritic(hidden_dim=hidden_dim).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, eps=1e-5)
 
@@ -259,6 +269,43 @@ def train_masked_ppo(
         json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8"
     )
     return summary
+
+
+@torch.no_grad()
+def infer_with_gear(
+    checkpoint_path: str | Path,
+    kit: PlayerKit,
+    timeline: EncounterTimeline,
+    gcd_s: float | None = None,
+    piety: int | None = None,
+    tenacity: int | None = None,
+    heal_scale: float | None = None,
+    max_hp_party: float | None = None,
+    max_hp_tank: float | None = None,
+    n_eval_pulls: int = 12,
+) -> dict[str, Any]:
+    """Run a trained gear-conditioned checkpoint with custom runtime gear parameters (no retraining)."""
+    ckpt = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+    hidden_dim = int(ckpt.get("hidden_dim", 128))
+    model = SkillAttentionActorCritic(hidden_dim=hidden_dim)
+    model.load_state_dict(ckpt["model_state_dict"])
+    model.eval()
+
+    custom_kit = kit.model_copy(deep=True)
+    if gcd_s is not None:
+        custom_kit.gcd_s = gcd_s
+    if piety is not None:
+        custom_kit.gear_stats.piety = piety
+    if tenacity is not None:
+        custom_kit.gear_stats.tenacity = tenacity
+    if heal_scale is not None:
+        custom_kit.gear_stats.heal_scale_multiplier = heal_scale
+    if max_hp_party is not None:
+        custom_kit.max_hp_party = max_hp_party
+    if max_hp_tank is not None:
+        custom_kit.max_hp_tank = max_hp_tank
+
+    return evaluate_policy(model, custom_kit, timeline, torch.device("cpu"), n_eval_pulls=n_eval_pulls)
 
 
 def main() -> None:

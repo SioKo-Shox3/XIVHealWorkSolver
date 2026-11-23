@@ -8,9 +8,11 @@ from xiv_healwork_solver.models import (
     DamageEvent,
     DowntimeWindow,
     EncounterTimeline,
+    GearSamplingRange,
     GearStats,
     LogFilterConfig,
     PlayerKit,
+    PrePullAction,
     ResourcePool,
     SkillDef,
 )
@@ -528,4 +530,86 @@ def test_codex_regression_env_preserves_deterministic_and_extractor_edge_cases()
         LogFilterConfig(),
     )
     assert len(acc) == 0 and len(rej) == 1
+
+
+def test_prepull_critlo_deploy_and_gear_conditioned_sampling():
+    """Verify pre-pull shield carries into t=0 with 0 DPS loss & CD ticks down, and gear sampling varies obs."""
+    kit = PlayerKit(
+        label="Prepull SCH",
+        role="healer",
+        max_hp_party=100_000,
+        prepull_actions=[
+            PrePullAction(
+                skill_id="deploy",
+                offset_s=-3.0,
+                target_channel="party",
+                override_shield_value=60_000,
+                consumes_cooldown=True,
+            )
+        ],
+        skills=[
+            SkillDef(
+                id="deploy",
+                name="展開戦術",
+                cooldown_s=90.0,
+                duration_s=30.0,
+                is_gcd=True,
+                weave_cost=1,
+                shield_value=30_000,
+                shield_stack_group="gcd_barrier",
+                lead_time_s=3.0,
+            )
+        ],
+    )
+    tl = EncounterTimeline(
+        encounter_name="Opener Raidwide",
+        duration_s=30.0,
+        events=[DamageEvent(id="op", time_s=10.0, name="Opener", raw_damage=140_000)],
+    )
+    plan = solve_mitigation_plan(kit, tl, verify_with_replay=True)
+    # Pre-pull 60k shield covers the 140k opener (100k + 60k - 140k = 20k) without re-casting Deploy (on CD until 87s!)
+    assert len(plan.actions) == 0
+    assert plan.replay is not None and plan.replay.survived is True
+    assert plan.replay.event_snapshots[0].hp_after["party"] == 20_000.0
+
+    # Gear-conditioned sampling produces distinct GCDs / Piety values across episodes
+    env = FF14HealMitEnv(kit, tl, gear_sampling=GearSamplingRange(), seed=99)
+    seen_gcds = set()
+    for _ in range(5):
+        obs = env.reset(deterministic=False)
+        seen_gcds.add(env.kit.gcd_s)
+        assert obs["state"].shape == (32,)
+    assert len(seen_gcds) >= 3
+
+    # Overheal efficiency scoring: lower overheal ranks strictly higher
+    acc, _ = curate_fight_candidates(
+        [
+            {
+                "report_code": "CLEAN_OH",
+                "fight_id": 1,
+                "duration_s": 500.0,
+                "deaths": 0,
+                "party_mit_casts": 20,
+                "healers": [
+                    {"name": "H1", "rdps": 14000, "effective_healing": 1_000_000, "overheal_pct": 20.0},
+                    {"name": "H2", "rdps": 14000, "effective_healing": 1_000_000, "overheal_pct": 25.0},
+                ],
+            },
+            {
+                "report_code": "WASTEFUL_OH",
+                "fight_id": 2,
+                "duration_s": 500.0,
+                "deaths": 0,
+                "party_mit_casts": 20,
+                "healers": [
+                    {"name": "H1", "rdps": 14000, "effective_healing": 1_000_000, "overheal_pct": 60.0},
+                    {"name": "H2", "rdps": 14000, "effective_healing": 1_000_000, "overheal_pct": 60.0},
+                ],
+            },
+        ],
+        LogFilterConfig(),
+    )
+    assert [r.report_code for r in acc] == ["CLEAN_OH", "WASTEFUL_OH"]
+    assert acc[0].quality_score > acc[1].quality_score
+
 

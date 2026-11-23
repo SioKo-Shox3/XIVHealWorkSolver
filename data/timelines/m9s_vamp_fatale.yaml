@@ -5024,3 +5024,7 @@ partner_profile:
   timing_mean_offset_s: -1.7
   timing_std_s: 1.0
   sample_count: 3
+partner_baseline_healing:
+  party_per_3s_tick: 6197.8
+  mt_per_3s_tick: 10894.7
+  st_per_3s_tick: 7992.8

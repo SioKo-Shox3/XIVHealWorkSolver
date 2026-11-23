@@ -270,6 +270,50 @@ class CombatEngine:
         self.active_dots = []
         self.special_debuffs = []
         self._event_snapshots_mit = {}
+
+        # Apply countdown pre-pull actions (t <= 0s: 0 DPS loss, out-of-combat MP stays full)
+        if start_time_s <= EPS and self.kit.prepull_actions:
+            skills_by_id = {sk.id: sk for sk in self.kit.skills}
+            for pp in sorted(self.kit.prepull_actions, key=lambda a: a.offset_s):
+                sk = skills_by_id.get(pp.skill_id)
+                if sk is None:
+                    continue
+                if pp.consumes_cooldown and sk.cooldown_s > 0 and self.skill_charges[sk.id] > 0:
+                    ready_t = pp.offset_s + sk.cooldown_s
+                    if ready_t > EPS:
+                        was_full = self.skill_charges[sk.id] == sk.max_charges
+                        self.skill_charges[sk.id] -= 1
+                        if was_full:
+                            self.skill_next_charge_at[sk.id] = ready_t
+                sh_amt = (
+                    pp.override_shield_value
+                    if pp.override_shield_value is not None
+                    else sk.shield_value * self.heal_scale
+                )
+                sh_exp = pp.offset_s + sk.effective_shield_duration()
+                if sh_amt > 0 and sh_exp > EPS:
+                    self._add_shield(pp.target_channel, sh_amt, sh_exp, sk.id, sk.shield_stack_group)
+                buf_exp = pp.offset_s + sk.duration_s
+                hot_ticks = max(1, int(round(sk.duration_s / 3.0))) if sk.duration_s >= 3.0 else 1
+                hot_per_tick = (sk.heal_hot_total * self.heal_scale) / hot_ticks if sk.heal_hot_total > 0 else 0.0
+                if buf_exp > EPS and (
+                    sk.mitigation_all > 0
+                    or sk.mitigation_physical > 0
+                    or sk.mitigation_magical > 0
+                    or hot_per_tick > 0
+                ):
+                    self.active_buffs.append(
+                        _ActiveBuff(
+                            skill_id=sk.id,
+                            stack_group=sk.stack_group,
+                            target_channel=pp.target_channel,
+                            expires_at=buf_exp,
+                            mit_all=sk.mitigation_all,
+                            mit_phys=sk.mitigation_physical,
+                            mit_mag=sk.mitigation_magical,
+                            hot_per_tick=hot_per_tick,
+                        )
+                    )
         self._queue = []
         self._seq = 0
         self._next_event_idx = 0
@@ -292,6 +336,8 @@ class CombatEngine:
             "raises_handled": 0.0,
             "mp_reserve_breaches": 0.0,
             "mp_min": self.resources.get("mp", 10_000.0),
+            "player_heal_raw": 0.0,
+            "player_heal_eff": 0.0,
             "min_party_hp_ratio": self.hp["party"] / self.max_hp["party"],
             "min_mt_hp_ratio": self.hp["mt"] / self.max_hp["mt"],
             "min_st_hp_ratio": self.hp["st"] / self.max_hp["st"],
@@ -415,7 +461,7 @@ class CombatEngine:
             else:
                 self.shields[ch].append(_ActiveShield(source_id, None, amount, exp))
 
-    def _apply_heal(self, channel: str, amount: float) -> float:
+    def _apply_heal(self, channel: str, amount: float, is_player_heal: bool = False) -> float:
         if amount <= 0.0:
             return 0.0
         targets = ("party", "mt", "st") if channel == "party" else (channel,)
@@ -430,6 +476,9 @@ class CombatEngine:
                 for db in self.special_debuffs:
                     if not db.cleared and db.kind == "full_heal_doom" and db.target_channel == ch:
                         db.cleared = True
+        if is_player_heal:
+            self.stats["player_heal_raw"] += raw_total
+            self.stats["player_heal_eff"] += eff
         return max(0.0, 1.0 - eff / max(1.0, raw_total))
 
     def _apply_cleanse(self, channel: str) -> bool:
@@ -672,7 +721,18 @@ class CombatEngine:
             # Active HoT ticks
             for b in self.active_buffs:
                 if b.expires_at >= self.t - EPS and b.hot_per_tick > 0:
-                    self._apply_heal(b.target_channel, b.hot_per_tick)
+                    oh = self._apply_heal(b.target_channel, b.hot_per_tick, is_player_heal=(not b.skill_id.startswith("partner_")))
+                    if not b.skill_id.startswith("partner_"):
+                        self._step_reward_accum -= oh * 0.02
+            # Partner baseline healing (co-healer GCD/short-CD healing & tank self-sustain from FFLogs)
+            pbh = self.timeline.partner_baseline_healing
+            if self.partner_trust_scale > 0:
+                if pbh.party_per_3s_tick > 0:
+                    self._apply_heal("party", pbh.party_per_3s_tick * self.partner_trust_scale)
+                if pbh.mt_per_3s_tick > 0:
+                    self._apply_heal("mt", pbh.mt_per_3s_tick * self.partner_trust_scale)
+                if pbh.st_per_3s_tick > 0:
+                    self._apply_heal("st", pbh.st_per_3s_tick * self.partner_trust_scale)
             # Optional passive baseline tank self-sustain
             if self.tank_passive_self_heal_per_tick > 0:
                 self._apply_heal("mt", self.tank_passive_self_heal_per_tick)
@@ -793,8 +853,8 @@ class CombatEngine:
                 sk.shield_stack_group,
             )
         if sk.heal_instant > 0:
-            overheal = self._apply_heal(channel, sk.heal_instant * self.heal_scale)
-            self._step_reward_accum -= overheal * 0.06
+            overheal = self._apply_heal(channel, sk.heal_instant * self.heal_scale, is_player_heal=True)
+            self._step_reward_accum -= overheal * (0.15 if sk.is_gcd else 0.06)
         if sk.cleanses_debuff:
             if self._apply_cleanse(channel):
                 self._step_reward_accum += 2.0
@@ -955,6 +1015,9 @@ class CombatEngine:
         return min(candidates)
 
     def build_verification(self) -> ReplayVerification:
+        raw_h = self.stats.get("player_heal_raw", 0.0)
+        eff_h = self.stats.get("player_heal_eff", 0.0)
+        oh_pct = ((raw_h - eff_h) / raw_h) * 100.0 if raw_h > EPS else 0.0
         return ReplayVerification(
             survived=not self.died,
             first_death_time_s=self.first_death_time_s,
@@ -968,6 +1031,7 @@ class CombatEngine:
             filler_gcds=int(self.stats["filler_gcds"]),
             gcd_heals=int(self.stats["gcd_heals"]),
             downtime_free_gcds=int(self.stats["downtime_free_gcds"]),
+            overheal_pct=round(oh_pct, 1),
             mp_min=round(self.stats["mp_min"], 1),
             event_snapshots=list(self.event_snapshots),
         )

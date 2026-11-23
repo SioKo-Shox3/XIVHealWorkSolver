@@ -210,6 +210,35 @@ class WeaveOverrideWindow(BaseModel):
     is_downtime: bool = False
 
 
+class PrePullAction(BaseModel):
+    """Action prepared during the countdown before pull (t < 0s, 0 DPS loss, MP resets to full)."""
+
+    skill_id: str
+    offset_s: float = Field(default=-3.0, le=0.0, description="Seconds before pull (e.g. -3.0s for Pre-pull Deploy)")
+    target_channel: Literal["party", "mt", "st"] = "party"
+    override_shield_value: float | None = Field(
+        default=None,
+        ge=0.0,
+        description="Optional override for combo prep (e.g. Recitation+Protraction+Adlo+Deploy crit shield)",
+    )
+    consumes_cooldown: bool = True
+
+
+class GearSamplingRange(BaseModel):
+    """Optional parameter ranges for gear-conditioned RL training (so one model adapts to any gear input)."""
+
+    gcd_min: float = 2.28
+    gcd_max: float = 2.50
+    piety_min: int = 440
+    piety_max: int = 1600
+    tenacity_min: int = 420
+    tenacity_max: int = 2200
+    heal_scale_min: float = 0.90
+    heal_scale_max: float = 1.15
+    hp_scale_min: float = 0.92
+    hp_scale_max: float = 1.12
+
+
 class PlayerKit(BaseModel):
     """User's editable skill kit, gear stats, and GCD/weave profile (completely job-agnostic)."""
 
@@ -238,6 +267,10 @@ class PlayerKit(BaseModel):
     gear_stats: GearStats = Field(default_factory=GearStats)
     resources: list[ResourcePool] = Field(default_factory=list)
     skills: list[SkillDef] = Field(default_factory=list)
+    prepull_actions: list[PrePullAction] = Field(
+        default_factory=list,
+        description="Countdown prep actions cast before t=0 (e.g. -3s Pre-pull Deploy / Shield / Star)",
+    )
     weave_overrides: list[WeaveOverrideWindow] = Field(default_factory=list)
 
     def weave_budget_at(self, time_s: float) -> int:
@@ -447,6 +480,14 @@ class PartnerActionProb(BaseModel):
         return max(0.0, min(1.0, 1.0 - remaining))
 
 
+class PartnerBaselineHealing(BaseModel):
+    """Continuous baseline effective healing per 3s tick from co-healer & tank self-sustain (from FFLogs Healing)."""
+
+    party_per_3s_tick: float = Field(default=0.0, ge=0.0)
+    mt_per_3s_tick: float = Field(default=0.0, ge=0.0)
+    st_per_3s_tick: float = Field(default=0.0, ge=0.0)
+
+
 class EncounterTimeline(BaseModel):
     """Normalized fight timeline plus movement/downtime/AA segments and partner behavior."""
 
@@ -458,6 +499,7 @@ class EncounterTimeline(BaseModel):
     downtime_windows: list[DowntimeWindow] = Field(default_factory=list)
     auto_attacks: list[AutoAttackSegment] = Field(default_factory=list)
     partner_profile: list[PartnerActionProb] = Field(default_factory=list)
+    partner_baseline_healing: PartnerBaselineHealing = Field(default_factory=PartnerBaselineHealing)
 
     def downtime_at(self, time_s: float) -> DowntimeWindow | None:
         for dw in self.downtime_windows:
@@ -506,6 +548,7 @@ class LogQualityReport(BaseModel):
     deaths: int
     combined_healer_rdps: float = 0.0
     healer_effective_shares: dict[str, float] = Field(default_factory=dict)
+    healer_overheal_pcts: dict[str, float] = Field(default_factory=dict)
     party_mit_casts_per_min: float = 0.0
     quality_score: float = 0.0
 
@@ -575,6 +618,7 @@ class ReplayVerification(BaseModel):
     filler_gcds: int = 0
     gcd_heals: int = 0
     downtime_free_gcds: int = 0
+    overheal_pct: float = 0.0
     mp_min: float = 10_000.0
     event_snapshots: list[ReplayEventSnapshot] = Field(default_factory=list)
 

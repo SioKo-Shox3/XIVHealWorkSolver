@@ -60,7 +60,8 @@ def _print_plan_table(plan) -> None:
                 f"  [green]Replay VERIFIED: SURVIVED[/green] | "
                 f"minHP(party={r.min_hp_ratio.get('party',0)*100:.1f}%, "
                 f"mt={r.min_hp_ratio.get('mt',0)*100:.1f}%, st={r.min_hp_ratio.get('st',0)*100:.1f}%) | "
-                f"fillerGCD={r.filler_gcds} gcdHeal={r.gcd_heals} freeDowntimeGCD={r.downtime_free_gcds} minMP={r.mp_min:.0f}"
+                f"fillerGCD={r.filler_gcds} gcdHeal={r.gcd_heals} freeDT={r.downtime_free_gcds} "
+                f"overheal={r.overheal_pct:.1f}% minMP={r.mp_min:.0f}"
             )
         else:
             console.print(
@@ -224,7 +225,8 @@ def build_encounter(
     for r in accepted[:5]:
         console.print(
             f"  [green]OK[/green] {r.report_code}#{r.fight_id} dur={r.duration_s}s "
-            f"combRDPS={r.combined_healer_rdps:.0f} shares={r.healer_effective_shares} score={r.quality_score}"
+            f"combRDPS={r.combined_healer_rdps:.0f} shares={r.healer_effective_shares} "
+            f"overheal={r.healer_overheal_pcts} score={r.quality_score}"
         )
     for r in rejected[:5]:
         console.print(f"  [yellow]REJ[/yellow] {r.report_code}#{r.fight_id} reasons={r.reasons}")
@@ -235,6 +237,41 @@ def build_encounter(
         f"[green]Saved '{timeline.encounter_name}' ({len(timeline.events)} events, "
         f"{len(timeline.auto_attacks)} AA segments, {len(timeline.partner_profile)} partner probs) -> {out}[/green]"
     )
+
+
+@app.command("infer-rl")
+def infer_rl(
+    checkpoint: Path = typer.Option(..., "--checkpoint", "-m", help="Path to trained best_policy.pt"),
+    kit_path: Path = typer.Option(..., "--kit", "-k", help="Path to base PlayerKit YAML"),
+    timeline_path: Path = typer.Option(..., "--timeline", "-t", help="Path to EncounterTimeline YAML"),
+    gcd_s: Optional[float] = typer.Option(None, "--gcd", help="Override GCD seconds (e.g. 2.42)"),
+    piety: Optional[int] = typer.Option(None, "--piety", help="Override Piety stat (e.g. 950)"),
+    tenacity: Optional[int] = typer.Option(None, "--tenacity", help="Override Tenacity stat"),
+    heal_scale: Optional[float] = typer.Option(None, "--heal-scale", help="Override heal/shield multiplier"),
+    max_hp_party: Optional[float] = typer.Option(None, "--hp-party", help="Override party max HP"),
+    max_hp_tank: Optional[float] = typer.Option(None, "--hp-tank", help="Override tank max HP"),
+    pulls: int = typer.Option(12, "--pulls", help="Evaluation pulls across 3s server-tick phases"),
+) -> None:
+    """Run a pre-trained gear-conditioned RL checkpoint with custom runtime gear parameters."""
+    from xiv_healwork_solver.rl.train_colab import infer_with_gear
+
+    kit = PlayerKit.from_yaml(kit_path)
+    timeline = EncounterTimeline.from_yaml(timeline_path)
+    res = infer_with_gear(
+        checkpoint_path=checkpoint,
+        kit=kit,
+        timeline=timeline,
+        gcd_s=gcd_s,
+        piety=piety,
+        tenacity=tenacity,
+        heal_scale=heal_scale,
+        max_hp_party=max_hp_party,
+        max_hp_tank=max_hp_tank,
+        n_eval_pulls=pulls,
+    )
+    summary = {k: v for k, v in res.items() if k != "deterministic_action_log"}
+    console.print(f"[bold cyan]RL Inference Result:[/bold cyan] {json.dumps(summary, ensure_ascii=False)}")
+    console.print(f"Scheduled actions (deterministic rollout): {len(res['deterministic_action_log'])}")
 
 
 @app.command("check-fflogs")
