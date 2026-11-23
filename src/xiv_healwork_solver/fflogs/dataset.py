@@ -156,7 +156,12 @@ def build_curated_encounter_timeline(
         f = next((x for x in ov["fights"] if int(x["id"]) == rep.fight_id), None)
         if f is None:
             continue
-        actors = {int(a["id"]): a for a in ov["masterData"]["actors"]}
+        fids = set(f.get("friendlyPlayers") or [])
+        actors = {
+            int(a["id"]): a
+            for a in ov["masterData"]["actors"]
+            if (not fids or int(a["id"]) in fids)
+        }
         # Exclude the target_spec player (e.g. Scholar) so partner_profile contains ONLY co-healer/tank/DPS!
         for a in actors.values():
             if str(a.get("subType", "")).lower() == target_spec.lower():

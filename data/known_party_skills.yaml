@@ -1,52 +1,60 @@
 # Verified Lv.100 FFXIV party / co-healer / tank mitigation & healing dictionary (from FFLogs masterData)
-# Keyed by exact FFXIV abilityGameID.
+# `role_slot` groups equivalent skills across jobs (e.g., PLD/WAR/DRK/GNB 40% tank CDs -> tank_40_mit)
+# so multi-pull PF aggregation does not dilute probabilities across different tank/healer job comps.
 skills:
   # Role / DPS mitigations
-  7535: {name: "リプライザル", target_channel: boss, stack_group: reprisal, duration_s: 15.0, mitigation_all: 0.10}
-  7549: {name: "牽制", target_channel: boss, stack_group: feint, duration_s: 15.0, mitigation_physical: 0.10, mitigation_magical: 0.05}
-  7560: {name: "アドル", target_channel: boss, stack_group: addle, duration_s: 15.0, mitigation_magical: 0.10, mitigation_physical: 0.05}
+  7535: {name: "リプライザル", role_slot: reprisal, target_channel: boss, stack_group: reprisal, duration_s: 15.0, mitigation_all: 0.10}
+  7549: {name: "牽制", role_slot: feint, target_channel: boss, stack_group: feint, duration_s: 15.0, mitigation_physical: 0.10, mitigation_magical: 0.05}
+  7560: {name: "アドル", role_slot: addle, target_channel: boss, stack_group: addle, duration_s: 15.0, mitigation_magical: 0.10, mitigation_physical: 0.05}
 
-  # Tank party mitigations
-  16471: {name: "ダークミッショナリー", target_channel: party, duration_s: 15.0, mitigation_magical: 0.10, mitigation_physical: 0.05}
-  16160: {name: "ハート・オブ・ライト", target_channel: party, duration_s: 15.0, mitigation_magical: 0.10, mitigation_physical: 0.05}
-  3540:  {name: "ディヴァインヴェール", target_channel: party, duration_s: 30.0, shield_value: 20000, heal_value: 14000}
-  7388:  {name: "シェイクオフ", target_channel: party, duration_s: 30.0, shield_value: 24000, heal_value: 14000}
+  # Tank party mitigations (aggregated across PLD/WAR/DRK/GNB)
+  16471: {name: "タンク全体軽減 (90s)", role_slot: tank_party_90, target_channel: party, duration_s: 15.0, mitigation_magical: 0.10, mitigation_physical: 0.05}
+  16160: {name: "タンク全体軽減 (90s)", role_slot: tank_party_90, target_channel: party, duration_s: 15.0, mitigation_magical: 0.10, mitigation_physical: 0.05}
+  3540:  {name: "タンク全体バリア (90s)", role_slot: tank_party_shield, target_channel: party, duration_s: 30.0, shield_value: 20000, heal_value: 14000}
+  7388:  {name: "タンク全体バリア (90s)", role_slot: tank_party_shield, target_channel: party, duration_s: 30.0, shield_value: 24000, heal_value: 14000}
 
-  # Tank personal mitigations (critical so healer solver knows tanks mitigate their own tankbusters!)
-  7531:  {name: "ランパート", target_channel: mt, duration_s: 20.0, mitigation_all: 0.20}
-  36920: {name: "ガーディアン", target_channel: mt, duration_s: 15.0, mitigation_all: 0.40, shield_value: 22000}
-  36923: {name: "ダムネーション", target_channel: mt, duration_s: 15.0, mitigation_all: 0.40}
-  36927: {name: "シャドウヴィジル", target_channel: mt, duration_s: 15.0, mitigation_all: 0.40}
-  36935: {name: "グレートネビュラ", target_channel: mt, duration_s: 15.0, mitigation_all: 0.40}
-  25746: {name: "ホーリーシェルトロン", target_channel: mt, duration_s: 8.0, mitigation_all: 0.28}
-  25751: {name: "原初の血気", target_channel: mt, duration_s: 8.0, mitigation_all: 0.19, shield_value: 14000}
-  25758: {name: "ハート・オブ・コランダム", target_channel: mt, duration_s: 8.0, mitigation_all: 0.28}
-  7393:  {name: "ブラックナイト", target_channel: mt, duration_s: 7.0, shield_value: 45000}
-  3634:  {name: "ダークマインド", target_channel: mt, duration_s: 10.0, mitigation_magical: 0.20, mitigation_physical: 0.10}
-  22:    {name: "ブルワーク", target_channel: mt, duration_s: 10.0, mitigation_all: 0.15}
-  16140: {name: "カモフラージュ", target_channel: mt, duration_s: 20.0, mitigation_all: 0.10}
-  25754: {name: "オブレーション", target_channel: mt, duration_s: 10.0, mitigation_all: 0.10}
-  7382:  {name: "インターベンション", target_channel: st, duration_s: 8.0, mitigation_all: 0.20}
-  16464: {name: "原初の猛り", target_channel: st, duration_s: 8.0, mitigation_all: 0.19}
+  # Tank personal mitigations (aggregated across PLD/WAR/DRK/GNB per MT/ST slot!)
+  7531:  {name: "ランパート", role_slot: tank_rampart, target_channel: mt, duration_s: 20.0, mitigation_all: 0.20}
+  36920: {name: "タンク40%大バフ", role_slot: tank_40_mit, target_channel: mt, duration_s: 15.0, mitigation_all: 0.40, shield_value: 12000}
+  36923: {name: "タンク40%大バフ", role_slot: tank_40_mit, target_channel: mt, duration_s: 15.0, mitigation_all: 0.40}
+  36927: {name: "タンク40%大バフ", role_slot: tank_40_mit, target_channel: mt, duration_s: 15.0, mitigation_all: 0.40}
+  36935: {name: "タンク40%大バフ", role_slot: tank_40_mit, target_channel: mt, duration_s: 15.0, mitigation_all: 0.40}
+  25746: {name: "タンク短バフ (25s)", role_slot: tank_short_mit, target_channel: mt, duration_s: 8.0, mitigation_all: 0.25}
+  25751: {name: "タンク短バフ (25s)", role_slot: tank_short_mit, target_channel: mt, duration_s: 8.0, mitigation_all: 0.20, shield_value: 14000}
+  25758: {name: "タンク短バフ (25s)", role_slot: tank_short_mit, target_channel: mt, duration_s: 8.0, mitigation_all: 0.25}
+  7393:  {name: "タンク短バリア (TBN)", role_slot: tank_short_shield, target_channel: mt, duration_s: 7.0, shield_value: 55000}
+  3634:  {name: "タンク補助軽減", role_slot: tank_aux_mit, target_channel: mt, duration_s: 10.0, mitigation_magical: 0.20, mitigation_physical: 0.10}
+  22:    {name: "タンク補助軽減", role_slot: tank_aux_mit, target_channel: mt, duration_s: 10.0, mitigation_all: 0.15}
+  16140: {name: "タンク補助軽減", role_slot: tank_aux_mit, target_channel: mt, duration_s: 20.0, mitigation_all: 0.10}
+  25754: {name: "タンク補助軽減", role_slot: tank_aux_mit, target_channel: mt, duration_s: 10.0, mitigation_all: 0.10}
+  7382:  {name: "相方タンク投げバフ", role_slot: tank_external_mit, target_channel: st, duration_s: 8.0, mitigation_all: 0.20}
+  16464: {name: "相方タンク投げバフ", role_slot: tank_external_mit, target_channel: st, duration_s: 8.0, mitigation_all: 0.19}
 
-  # Pure Healers (WHM / AST)
-  16536: {name: "テンパランス", target_channel: party, duration_s: 20.0, mitigation_all: 0.10}
-  3569:  {name: "アサイラム", target_channel: party, duration_s: 24.0, heal_value: 32000}
-  25862: {name: "リタージー・オブ・ベル", target_channel: party, duration_s: 20.0, heal_value: 45000}
-  25861: {name: "アクアヴェール", target_channel: mt, duration_s: 8.0, mitigation_all: 0.15}
-  3613:  {name: "運命の輪", target_channel: party, duration_s: 15.0, mitigation_all: 0.10, heal_value: 22000}
-  37031: {name: "サンサイン", target_channel: party, duration_s: 15.0, mitigation_all: 0.10}
-  16559: {name: "ニュートラルセクト", target_channel: party, duration_s: 20.0, shield_value: 16000, heal_value: 16000}
-  7439:  {name: "アーサリースター", target_channel: party, duration_s: 10.0, heal_value: 32000}
-  25874: {name: "マクロコスモス", target_channel: party, duration_s: 15.0, heal_value: 38000}
+  # Pure Healers (WHM / AST aggregated across jobs!)
+  16536: {name: "ピュアヒラ10%全体軽減", role_slot: pure_healer_mit_10, target_channel: party, duration_s: 20.0, mitigation_all: 0.10}
+  3613:  {name: "ピュアヒラ10%全体軽減", role_slot: pure_healer_mit_10, target_channel: party, duration_s: 15.0, mitigation_all: 0.10, heal_value: 22000}
+  37031: {name: "ピュアヒラ10%全体軽減2", role_slot: pure_healer_mit_10_b, target_channel: party, duration_s: 15.0, mitigation_all: 0.10}
+  37011: {name: "ディヴァインカレス (全体バリア+HoT)", role_slot: pure_healer_caress, target_channel: party, duration_s: 15.0, shield_value: 24000, heal_value: 16000}
+  16559: {name: "ニュートラルセクト", role_slot: pure_healer_barrier, target_channel: party, duration_s: 20.0, shield_value: 20000, heal_value: 18000}
+  3569:  {name: "ピュアヒラ範囲HoT/設置", role_slot: pure_healer_aoe_hot, target_channel: party, duration_s: 24.0, heal_value: 34000}
+  7439:  {name: "ピュアヒラ範囲HoT/設置", role_slot: pure_healer_aoe_hot, target_channel: party, duration_s: 10.0, heal_value: 34000}
+  25862: {name: "ピュアヒラ大戻し (ベル/マクロ)", role_slot: pure_healer_mega_heal, target_channel: party, duration_s: 20.0, heal_value: 55000}
+  25874: {name: "ピュアヒラ大戻し (ベル/マクロ)", role_slot: pure_healer_mega_heal, target_channel: party, duration_s: 15.0, heal_value: 45000}
+  16534: {name: "アサイズ/ラプチャー等 (範囲即時戻し)", role_slot: pure_healer_aoe_instant, target_channel: party, duration_s: 0.0, heal_value: 24000}
+  3571:  {name: "アサイズ (範囲即時戻し)", role_slot: pure_healer_assize, target_channel: party, duration_s: 0.0, heal_value: 22000}
+  7433:  {name: "インドゥルゲンティア", role_slot: pure_healer_plenary, target_channel: party, duration_s: 10.0, heal_value: 14000}
+  37010: {name: "メディガ (範囲戻し+HoT)", role_slot: pure_healer_medica, target_channel: party, duration_s: 15.0, heal_value: 32000}
+  7432:  {name: "ディヴァインベニゾン", role_slot: pure_healer_tank_shield, target_channel: mt, duration_s: 15.0, shield_value: 26000}
+  3570:  {name: "テトラグラマトン", role_slot: pure_healer_tank_heal, target_channel: mt, duration_s: 0.0, heal_value: 36000}
+  25861: {name: "アクアヴェール", role_slot: pure_healer_tank_mit, target_channel: mt, duration_s: 8.0, mitigation_all: 0.15}
 
-  # Barrier Healers (SCH / SGE) when acting as co-healer
-  188:   {name: "野戦治療の陣", target_channel: party, duration_s: 15.0, mitigation_all: 0.10, heal_value: 22000}
-  25868: {name: "疾風怒濤の計", target_channel: party, duration_s: 20.0, mitigation_all: 0.10}
-  16538: {name: "フェイイルミネーション", target_channel: party, duration_s: 20.0, mitigation_magical: 0.05}
-  16537: {name: "光の囁き", target_channel: party, duration_s: 21.0, heal_value: 34000}
-  16546: {name: "コンソレイション", target_channel: party, duration_s: 30.0, shield_value: 14000, heal_value: 14000}
-  24298: {name: "ケーラコレ", target_channel: party, duration_s: 15.0, mitigation_all: 0.10, heal_value: 20000}
-  24302: {name: "ピュシスII", target_channel: party, duration_s: 15.0, heal_value: 26000}
-  24310: {name: "ホーリズム", target_channel: party, duration_s: 20.0, mitigation_all: 0.10, shield_value: 16000, heal_value: 16000}
-  24311: {name: "パンハイマ", target_channel: party, duration_s: 15.0, shield_value: 28000}
+  # Barrier Healers (SCH / SGE when acting as co-healer)
+  188:   {name: "バリアヒラ10%陣/ケーラ", role_slot: barrier_healer_mit_10, target_channel: party, duration_s: 15.0, mitigation_all: 0.10, heal_value: 22000}
+  24298: {name: "バリアヒラ10%陣/ケーラ", role_slot: barrier_healer_mit_10, target_channel: party, duration_s: 15.0, mitigation_all: 0.10, heal_value: 22000}
+  25868: {name: "バリアヒラ120s軽減", role_slot: barrier_healer_mit_120, target_channel: party, duration_s: 20.0, mitigation_all: 0.10}
+  24310: {name: "バリアヒラ120s軽減", role_slot: barrier_healer_mit_120, target_channel: party, duration_s: 20.0, mitigation_all: 0.10, shield_value: 16000, heal_value: 16000}
+  16538: {name: "フェイイルミネーション", role_slot: barrier_healer_mag_5, target_channel: party, duration_s: 20.0, mitigation_magical: 0.05}
+  16537: {name: "バリアヒラ範囲HoT", role_slot: barrier_healer_hot, target_channel: party, duration_s: 21.0, heal_value: 32000}
+  24302: {name: "バリアヒラ範囲HoT", role_slot: barrier_healer_hot, target_channel: party, duration_s: 15.0, heal_value: 28000}
+  16546: {name: "バリアヒラ追加バリア", role_slot: barrier_healer_extra_shield, target_channel: party, duration_s: 30.0, shield_value: 16000, heal_value: 14000}
+  24311: {name: "バリアヒラ追加バリア", role_slot: barrier_healer_extra_shield, target_channel: party, duration_s: 15.0, shield_value: 28000}

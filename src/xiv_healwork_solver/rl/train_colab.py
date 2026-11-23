@@ -108,6 +108,68 @@ def evaluate_policy(
     }
 
 
+def _collect_bc_dataset(
+    kit: PlayerKit,
+    timeline: EncounterTimeline,
+    plan_actions: list[dict[str, Any]],
+    gear_range: GearSamplingRange | None,
+    n_trajectories: int = 8,
+    seed: int = 42,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Generate supervised (obs, expert_action) trajectories by rolling out a CP-SAT plan across varied gear."""
+    env = FF14HealMitEnv(kit, timeline, gear_sampling=gear_range, raise_prob_per_pull=0.0, seed=seed)
+    idx_by_key: dict[tuple[str, str], int] = {}
+    idx_by_skill: dict[str, int] = {}
+    for entry in env.actions[2:]:
+        assert entry.skill is not None
+        idx_by_key[(entry.skill.id, entry.target_channel)] = entry.index
+        idx_by_skill.setdefault(entry.skill.id, entry.index)
+
+    scheduled = sorted(plan_actions, key=lambda a: (float(a["cast_at_s"]), 0 if a.get("is_gcd") else 1))
+    states, skills, futures, masks, actions = [], [], [], [], []
+
+    for i in range(n_trajectories):
+        phase = (3.0 * i) / max(1, n_trajectories)
+        obs = env.reset(deterministic=(i == 0), fixed_tick_phase=phase)
+        ptr = 0
+        done = False
+        while not done:
+            t = env.t
+            mask = obs["mask"]
+            chosen = 0
+            while ptr < len(scheduled) and float(scheduled[ptr]["cast_at_s"]) < t - 1.5:
+                ptr += 1
+            if ptr < len(scheduled) and float(scheduled[ptr]["cast_at_s"]) <= t + 0.25:
+                act = scheduled[ptr]
+                aidx = idx_by_key.get((act["skill_id"], act.get("target_channel", "party")), idx_by_skill.get(act["skill_id"], 0))
+                if mask[aidx]:
+                    chosen = aidx
+                    ptr += 1
+            if chosen == 0 and mask[1]:
+                imminent_gcd = (
+                    ptr < len(scheduled)
+                    and scheduled[ptr].get("is_gcd", False)
+                    and float(scheduled[ptr]["cast_at_s"]) < t + env.kit.gcd_s - 1e-4
+                )
+                if not imminent_gcd:
+                    chosen = 1
+
+            states.append(obs["state"])
+            skills.append(obs["skills"])
+            futures.append(obs["future"])
+            masks.append(mask)
+            actions.append(chosen)
+            obs, _, done, _ = env.step(chosen, deterministic=(i == 0))
+
+    return (
+        np.asarray(states, dtype=np.float32),
+        np.asarray(skills, dtype=np.float32),
+        np.asarray(futures, dtype=np.float32),
+        np.asarray(masks, dtype=np.bool_),
+        np.asarray(actions, dtype=np.int64),
+    )
+
+
 def train_masked_ppo(
     kit: PlayerKit,
     timeline: EncounterTimeline,
@@ -121,22 +183,56 @@ def train_masked_ppo(
     ent_coef: float = 0.015,
     vf_coef: float = 0.5,
     gear_conditioned: bool = True,
+    bc_plan_actions: list[dict[str, Any]] | None = None,
+    bc_epochs: int = 15,
     seed: int = 42,
     out_dir: str | Path = "outputs/rl_run",
 ) -> dict[str, Any]:
-    """Train gear-conditioned SkillAttentionActorCritic with Masked PPO on GPU/CPU."""
+    """Train gear-conditioned SkillAttentionActorCritic with optional BC warm-start + Masked PPO."""
     torch.manual_seed(seed)
     np.random.seed(seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     gear_range = GearSamplingRange() if gear_conditioned else None
     print(
-        f"[RL] Device: {device} | GearConditioned={gear_conditioned} | "
+        f"[RL] Device: {device} | GearConditioned={gear_conditioned} | BC={bool(bc_plan_actions)} | "
         f"Kit: {kit.label} | Timeline: {timeline.encounter_name}"
     )
 
     env = FF14HealMitEnv(kit, timeline, gear_sampling=gear_range, seed=seed)
     model = SkillAttentionActorCritic(hidden_dim=hidden_dim).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, eps=1e-5)
+
+    # Optional Behavior Cloning warm-start from CP-SAT / FFLogs expert trajectories
+    if bc_plan_actions and bc_epochs > 0:
+        bc_st, bc_sk, bc_fu, bc_mk, bc_ac = _collect_bc_dataset(
+            kit, timeline, bc_plan_actions, gear_range, n_trajectories=10, seed=seed
+        )
+        t_st = torch.from_numpy(bc_st).to(device)
+        t_sk = torch.from_numpy(bc_sk).to(device)
+        t_fu = torch.from_numpy(bc_fu).to(device)
+        t_mk = torch.from_numpy(bc_mk).to(device)
+        t_ac = torch.from_numpy(bc_ac).to(device)
+        ce_loss = nn.CrossEntropyLoss()
+        bc_opt = torch.optim.AdamW(model.parameters(), lr=1e-3)
+        model.train()
+        n_bc = len(bc_ac)
+        bc_idxs = np.arange(n_bc)
+        for ep in range(1, bc_epochs + 1):
+            np.random.shuffle(bc_idxs)
+            tot_loss = 0.0
+            batches = 0
+            for start in range(0, n_bc, minibatch_size):
+                mb = bc_idxs[start : start + minibatch_size]
+                logits, _ = model.forward(t_st[mb], t_sk[mb], t_fu[mb], t_mk[mb])
+                loss = ce_loss(logits, t_ac[mb])
+                bc_opt.zero_grad()
+                loss.backward()
+                nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+                bc_opt.step()
+                tot_loss += float(loss.item())
+                batches += 1
+            if ep == 1 or ep == bc_epochs:
+                print(f"[BC Epoch {ep:2d}/{bc_epochs}] samples={n_bc} loss={tot_loss / max(1, batches):.4f}")
 
     out_path = Path(out_dir)
     out_path.mkdir(parents=True, exist_ok=True)

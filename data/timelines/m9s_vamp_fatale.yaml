@@ -1281,7 +1281,7 @@ auto_attacks:
   interval_s: 3.0
 partner_profile:
 - event_id: dot_1002942_312
-  skill_name: オブレーション
+  skill_name: タンク補助軽減
   source_role: tank
   target_channel: mt
   stack_group: null
@@ -1293,11 +1293,11 @@ partner_profile:
   shield_value: 0.0
   heal_value: 0.0
   probability: 0.667
-  timing_mean_offset_s: -2.32
-  timing_std_s: 0.03
+  timing_mean_offset_s: -2.79
+  timing_std_s: 0.5
   sample_count: 3
 - event_id: dot_1002942_312
-  skill_name: ブラックナイト
+  skill_name: タンク短バリア (TBN)
   source_role: tank
   target_channel: mt
   stack_group: null
@@ -1306,30 +1306,46 @@ partner_profile:
   mitigation_all: 0.0
   mitigation_physical: 0.0
   mitigation_magical: 0.0
-  shield_value: 45000.0
+  shield_value: 55000.0
   heal_value: 0.0
   probability: 0.667
   timing_mean_offset_s: -0.45
   timing_std_s: 0.06
   sample_count: 3
 - event_id: dot_1002942_312
-  skill_name: ダークマインド
-  source_role: tank
+  skill_name: ディヴァインベニゾン
+  source_role: healer
   target_channel: mt
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 15.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 26000.0
+  heal_value: 0.0
+  probability: 0.333
+  timing_mean_offset_s: -2.84
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: dot_1002942_312
+  skill_name: インドゥルゲンティア
+  source_role: healer
+  target_channel: party
   stack_group: null
   shield_stack_group: null
   duration_s: 10.0
   mitigation_all: 0.0
-  mitigation_physical: 0.1
-  mitigation_magical: 0.2
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
   shield_value: 0.0
-  heal_value: 0.0
+  heal_value: 14000.0
   probability: 0.333
-  timing_mean_offset_s: -3.29
+  timing_mean_offset_s: 2.91
   timing_std_s: 1.0
   sample_count: 3
 - event_id: dot_1002942_312
-  skill_name: テンパランス
+  skill_name: ピュアヒラ10%全体軽減
   source_role: healer
   target_channel: party
   stack_group: null
@@ -1345,13 +1361,61 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: dot_1002942_312
-  skill_name: ホーリーシェルトロン
-  source_role: tank
+  skill_name: ディヴァインカレス (全体バリア+HoT)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 15.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 24000.0
+  heal_value: 16000.0
+  probability: 0.333
+  timing_mean_offset_s: -2.5
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: dot_1002942_312
+  skill_name: アサイズ/ラプチャー等 (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 24000.0
+  probability: 0.333
+  timing_mean_offset_s: 5.03
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: dot_1002942_312
+  skill_name: テトラグラマトン
+  source_role: healer
   target_channel: mt
   stack_group: null
   shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 36000.0
+  probability: 0.333
+  timing_mean_offset_s: 6.06
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: dot_1002942_312
+  skill_name: タンク短バフ (25s)
+  source_role: tank
+  target_channel: st
+  stack_group: null
+  shield_stack_group: null
   duration_s: 8.0
-  mitigation_all: 0.28
+  mitigation_all: 0.25
   mitigation_physical: 0.0
   mitigation_magical: 0.0
   shield_value: 0.0
@@ -1361,7 +1425,7 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: dot_500000_312
-  skill_name: オブレーション
+  skill_name: タンク補助軽減
   source_role: tank
   target_channel: mt
   stack_group: null
@@ -1373,11 +1437,11 @@ partner_profile:
   shield_value: 0.0
   heal_value: 0.0
   probability: 0.667
-  timing_mean_offset_s: -2.32
-  timing_std_s: 0.03
+  timing_mean_offset_s: -2.79
+  timing_std_s: 0.5
   sample_count: 3
 - event_id: dot_500000_312
-  skill_name: ブラックナイト
+  skill_name: タンク短バリア (TBN)
   source_role: tank
   target_channel: mt
   stack_group: null
@@ -1386,30 +1450,46 @@ partner_profile:
   mitigation_all: 0.0
   mitigation_physical: 0.0
   mitigation_magical: 0.0
-  shield_value: 45000.0
+  shield_value: 55000.0
   heal_value: 0.0
   probability: 0.667
   timing_mean_offset_s: -0.45
   timing_std_s: 0.06
   sample_count: 3
 - event_id: dot_500000_312
-  skill_name: ダークマインド
-  source_role: tank
+  skill_name: ディヴァインベニゾン
+  source_role: healer
   target_channel: mt
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 15.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 26000.0
+  heal_value: 0.0
+  probability: 0.333
+  timing_mean_offset_s: -2.84
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: dot_500000_312
+  skill_name: インドゥルゲンティア
+  source_role: healer
+  target_channel: party
   stack_group: null
   shield_stack_group: null
   duration_s: 10.0
   mitigation_all: 0.0
-  mitigation_physical: 0.1
-  mitigation_magical: 0.2
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
   shield_value: 0.0
-  heal_value: 0.0
+  heal_value: 14000.0
   probability: 0.333
-  timing_mean_offset_s: -3.29
+  timing_mean_offset_s: 2.91
   timing_std_s: 1.0
   sample_count: 3
 - event_id: dot_500000_312
-  skill_name: テンパランス
+  skill_name: ピュアヒラ10%全体軽減
   source_role: healer
   target_channel: party
   stack_group: null
@@ -1425,13 +1505,61 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: dot_500000_312
-  skill_name: ホーリーシェルトロン
-  source_role: tank
+  skill_name: ディヴァインカレス (全体バリア+HoT)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 15.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 24000.0
+  heal_value: 16000.0
+  probability: 0.333
+  timing_mean_offset_s: -2.5
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: dot_500000_312
+  skill_name: アサイズ/ラプチャー等 (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 24000.0
+  probability: 0.333
+  timing_mean_offset_s: 5.03
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: dot_500000_312
+  skill_name: テトラグラマトン
+  source_role: healer
   target_channel: mt
   stack_group: null
   shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 36000.0
+  probability: 0.333
+  timing_mean_offset_s: 6.06
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: dot_500000_312
+  skill_name: タンク短バフ (25s)
+  source_role: tank
+  target_channel: st
+  stack_group: null
+  shield_stack_group: null
   duration_s: 8.0
-  mitigation_all: 0.28
+  mitigation_all: 0.25
   mitigation_physical: 0.0
   mitigation_magical: 0.0
   shield_value: 0.0
@@ -1439,6 +1567,22 @@ partner_profile:
   probability: 0.333
   timing_mean_offset_s: -1.58
   timing_std_s: 1.0
+  sample_count: 3
+- event_id: e10_45935_172
+  skill_name: アサイズ/ラプチャー等 (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 24000.0
+  probability: 0.667
+  timing_mean_offset_s: 0.36
+  timing_std_s: 0.36
   sample_count: 3
 - event_id: e10_45935_172
   skill_name: リプライザル
@@ -1457,7 +1601,7 @@ partner_profile:
   timing_std_s: 0.33
   sample_count: 3
 - event_id: e10_45935_172
-  skill_name: ダークミッショナリー
+  skill_name: タンク全体軽減 (90s)
   source_role: tank
   target_channel: party
   stack_group: null
@@ -1488,8 +1632,104 @@ partner_profile:
   timing_mean_offset_s: -2.18
   timing_std_s: 1.0
   sample_count: 3
+- event_id: e10_45935_172
+  skill_name: ディヴァインベニゾン
+  source_role: healer
+  target_channel: mt
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 15.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 26000.0
+  heal_value: 0.0
+  probability: 0.333
+  timing_mean_offset_s: -10.6
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e10_45935_172
+  skill_name: アサイズ (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 22000.0
+  probability: 0.333
+  timing_mean_offset_s: 0.89
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e10_45935_172
+  skill_name: テトラグラマトン
+  source_role: healer
+  target_channel: mt
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 36000.0
+  probability: 0.333
+  timing_mean_offset_s: 3.43
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e11_45970_194
+  skill_name: ディヴァインベニゾン
+  source_role: healer
+  target_channel: mt
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 15.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 26000.0
+  heal_value: 0.0
+  probability: 0.333
+  timing_mean_offset_s: -7.37
+  timing_std_s: 1.0
+  sample_count: 3
 - event_id: e12_45970_196
-  skill_name: シャドウヴィジル
+  skill_name: アサイズ/ラプチャー等 (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 24000.0
+  probability: 0.667
+  timing_mean_offset_s: 6.67
+  timing_std_s: 0.59
+  sample_count: 3
+- event_id: e12_45970_196
+  skill_name: ディヴァインベニゾン
+  source_role: healer
+  target_channel: mt
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 15.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 26000.0
+  heal_value: 0.0
+  probability: 0.333
+  timing_mean_offset_s: -9.38
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e12_45970_196
+  skill_name: タンク40%大バフ
   source_role: tank
   target_channel: mt
   stack_group: null
@@ -1505,7 +1745,55 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e13_45970_198
-  skill_name: シャドウヴィジル
+  skill_name: アサイズ/ラプチャー等 (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 24000.0
+  probability: 0.667
+  timing_mean_offset_s: 4.67
+  timing_std_s: 0.59
+  sample_count: 3
+- event_id: e13_45970_198
+  skill_name: ディヴァインベニゾン
+  source_role: healer
+  target_channel: mt
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 15.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 26000.0
+  heal_value: 0.0
+  probability: 0.333
+  timing_mean_offset_s: -11.38
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e13_45970_198
+  skill_name: テトラグラマトン
+  source_role: healer
+  target_channel: mt
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 36000.0
+  probability: 0.333
+  timing_mean_offset_s: 7.16
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e13_45970_198
+  skill_name: タンク40%大バフ
   source_role: tank
   target_channel: mt
   stack_group: null
@@ -1521,7 +1809,39 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e14_45970_200
-  skill_name: シャドウヴィジル
+  skill_name: アサイズ/ラプチャー等 (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 24000.0
+  probability: 0.667
+  timing_mean_offset_s: 2.66
+  timing_std_s: 0.59
+  sample_count: 3
+- event_id: e14_45970_200
+  skill_name: テトラグラマトン
+  source_role: healer
+  target_channel: mt
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 36000.0
+  probability: 0.333
+  timing_mean_offset_s: 5.15
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e14_45970_200
+  skill_name: タンク40%大バフ
   source_role: tank
   target_channel: mt
   stack_group: null
@@ -1537,23 +1857,7 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e15_45951_221
-  skill_name: ブラックナイト
-  source_role: tank
-  target_channel: mt
-  stack_group: null
-  shield_stack_group: null
-  duration_s: 7.0
-  mitigation_all: 0.0
-  mitigation_physical: 0.0
-  mitigation_magical: 0.0
-  shield_value: 45000.0
-  heal_value: 0.0
-  probability: 1.0
-  timing_mean_offset_s: -1.88
-  timing_std_s: 1.01
-  sample_count: 3
-- event_id: e15_45951_221
-  skill_name: シャドウヴィジル
+  skill_name: タンク40%大バフ
   source_role: tank
   target_channel: mt
   stack_group: null
@@ -1565,40 +1869,56 @@ partner_profile:
   shield_value: 0.0
   heal_value: 0.0
   probability: 0.667
-  timing_mean_offset_s: -4.49
-  timing_std_s: 0.79
+  timing_mean_offset_s: -5.2
+  timing_std_s: 1.5
   sample_count: 3
 - event_id: e15_45951_221
-  skill_name: オブレーション
+  skill_name: タンク短バリア (TBN)
   source_role: tank
   target_channel: mt
   stack_group: null
   shield_stack_group: null
-  duration_s: 10.0
-  mitigation_all: 0.1
+  duration_s: 7.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 55000.0
+  heal_value: 0.0
+  probability: 0.667
+  timing_mean_offset_s: -1.3
+  timing_std_s: 0.72
+  sample_count: 3
+- event_id: e15_45951_221
+  skill_name: アサイズ/ラプチャー等 (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
   mitigation_physical: 0.0
   mitigation_magical: 0.0
   shield_value: 0.0
-  heal_value: 0.0
+  heal_value: 24000.0
   probability: 0.667
-  timing_mean_offset_s: -5.39
-  timing_std_s: 1.66
+  timing_mean_offset_s: 3.46
+  timing_std_s: 1.77
   sample_count: 3
 - event_id: e15_45951_221
-  skill_name: ダークマインド
+  skill_name: タンク40%大バフ
   source_role: tank
-  target_channel: mt
+  target_channel: st
   stack_group: null
   shield_stack_group: null
-  duration_s: 10.0
-  mitigation_all: 0.0
-  mitigation_physical: 0.1
-  mitigation_magical: 0.2
-  shield_value: 0.0
+  duration_s: 15.0
+  mitigation_all: 0.4
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 12000.0
   heal_value: 0.0
   probability: 0.667
-  timing_mean_offset_s: -3.83
-  timing_std_s: 2.55
+  timing_mean_offset_s: -4.32
+  timing_std_s: 0.97
   sample_count: 3
 - event_id: e15_45951_221
   skill_name: リプライザル
@@ -1617,13 +1937,13 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e15_45951_221
-  skill_name: ホーリーシェルトロン
+  skill_name: タンク短バフ (25s)
   source_role: tank
-  target_channel: mt
+  target_channel: st
   stack_group: null
   shield_stack_group: null
   duration_s: 8.0
-  mitigation_all: 0.28
+  mitigation_all: 0.25
   mitigation_physical: 0.0
   mitigation_magical: 0.0
   shield_value: 0.0
@@ -1635,7 +1955,7 @@ partner_profile:
 - event_id: e15_45951_221
   skill_name: ランパート
   source_role: tank
-  target_channel: mt
+  target_channel: st
   stack_group: null
   shield_stack_group: null
   duration_s: 20.0
@@ -1646,22 +1966,6 @@ partner_profile:
   heal_value: 0.0
   probability: 0.333
   timing_mean_offset_s: -1.65
-  timing_std_s: 1.0
-  sample_count: 3
-- event_id: e15_45951_221
-  skill_name: グレートネビュラ
-  source_role: tank
-  target_channel: mt
-  stack_group: null
-  shield_stack_group: null
-  duration_s: 15.0
-  mitigation_all: 0.4
-  mitigation_physical: 0.0
-  mitigation_magical: 0.0
-  shield_value: 0.0
-  heal_value: 0.0
-  probability: 0.333
-  timing_mean_offset_s: -6.7
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e15_45951_221
@@ -1681,13 +1985,61 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e15_45951_221
-  skill_name: ハート・オブ・コランダム
+  skill_name: タンク補助軽減
+  source_role: tank
+  target_channel: st
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 10.0
+  mitigation_all: 0.1
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 0.0
+  probability: 0.333
+  timing_mean_offset_s: -3.72
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e15_45951_221
+  skill_name: タンク短バリア (TBN)
+  source_role: tank
+  target_channel: st
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 7.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 55000.0
+  heal_value: 0.0
+  probability: 0.333
+  timing_mean_offset_s: -3.06
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e15_45951_221
+  skill_name: ディヴァインベニゾン
+  source_role: healer
+  target_channel: mt
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 15.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 26000.0
+  heal_value: 0.0
+  probability: 0.333
+  timing_mean_offset_s: -2.74
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e15_45951_221
+  skill_name: タンク短バフ (25s)
   source_role: tank
   target_channel: mt
   stack_group: null
   shield_stack_group: null
   duration_s: 8.0
-  mitigation_all: 0.28
+  mitigation_all: 0.25
   mitigation_physical: 0.0
   mitigation_magical: 0.0
   shield_value: 0.0
@@ -1697,7 +2049,23 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e15_45951_221
-  skill_name: インターベンション
+  skill_name: タンク補助軽減
+  source_role: tank
+  target_channel: mt
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 10.0
+  mitigation_all: 0.1
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 0.0
+  probability: 0.333
+  timing_mean_offset_s: -7.05
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e15_45951_221
+  skill_name: 相方タンク投げバフ
   source_role: tank
   target_channel: st
   stack_group: null
@@ -1712,24 +2080,24 @@ partner_profile:
   timing_mean_offset_s: -5.48
   timing_std_s: 1.0
   sample_count: 3
-- event_id: e15_45951_221
-  skill_name: ガーディアン
-  source_role: tank
-  target_channel: mt
+- event_id: e16_45942_236
+  skill_name: アサイズ/ラプチャー等 (範囲即時戻し)
+  source_role: healer
+  target_channel: party
   stack_group: null
   shield_stack_group: null
-  duration_s: 15.0
-  mitigation_all: 0.4
+  duration_s: 0.0
+  mitigation_all: 0.0
   mitigation_physical: 0.0
   mitigation_magical: 0.0
-  shield_value: 22000.0
-  heal_value: 0.0
-  probability: 0.333
-  timing_mean_offset_s: -3.35
-  timing_std_s: 1.0
+  shield_value: 0.0
+  heal_value: 24000.0
+  probability: 0.667
+  timing_mean_offset_s: 4.86
+  timing_std_s: 0.41
   sample_count: 3
 - event_id: e16_45942_236
-  skill_name: ダークマインド
+  skill_name: タンク補助軽減
   source_role: tank
   target_channel: mt
   stack_group: null
@@ -1744,8 +2112,40 @@ partner_profile:
   timing_mean_offset_s: -2.41
   timing_std_s: 1.0
   sample_count: 3
+- event_id: e16_45942_236
+  skill_name: ピュアヒラ大戻し (ベル/マクロ)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 20.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 55000.0
+  probability: 0.333
+  timing_mean_offset_s: 3.69
+  timing_std_s: 1.0
+  sample_count: 3
 - event_id: e17_45942_239
-  skill_name: ダークマインド
+  skill_name: アサイズ/ラプチャー等 (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 24000.0
+  probability: 0.667
+  timing_mean_offset_s: 1.17
+  timing_std_s: 0.41
+  sample_count: 3
+- event_id: e17_45942_239
+  skill_name: タンク補助軽減
   source_role: tank
   target_channel: mt
   stack_group: null
@@ -1761,7 +2161,7 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e17_45942_239
-  skill_name: リタージー・オブ・ベル
+  skill_name: ピュアヒラ大戻し (ベル/マクロ)
   source_role: healer
   target_channel: party
   stack_group: null
@@ -1771,10 +2171,42 @@ partner_profile:
   mitigation_physical: 0.0
   mitigation_magical: 0.0
   shield_value: 0.0
-  heal_value: 45000.0
+  heal_value: 55000.0
   probability: 0.333
   timing_mean_offset_s: 0.0
   timing_std_s: 1.0
+  sample_count: 3
+- event_id: e17_45942_239
+  skill_name: ピュアヒラ範囲HoT/設置
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 10.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 34000.0
+  probability: 0.333
+  timing_mean_offset_s: 4.34
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e18_45955_258
+  skill_name: タンク全体軽減 (90s)
+  source_role: tank
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 15.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.05
+  mitigation_magical: 0.1
+  shield_value: 0.0
+  heal_value: 0.0
+  probability: 0.667
+  timing_mean_offset_s: -2.38
+  timing_std_s: 1.18
   sample_count: 3
 - event_id: e18_45955_258
   skill_name: アドル
@@ -1825,39 +2257,23 @@ partner_profile:
   timing_std_s: 0.84
   sample_count: 3
 - event_id: e18_45955_258
-  skill_name: ダークミッショナリー
-  source_role: tank
+  skill_name: アサイズ/ラプチャー等 (範囲即時戻し)
+  source_role: healer
   target_channel: party
   stack_group: null
   shield_stack_group: null
-  duration_s: 15.0
+  duration_s: 0.0
   mitigation_all: 0.0
-  mitigation_physical: 0.05
-  mitigation_magical: 0.1
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
   shield_value: 0.0
-  heal_value: 0.0
+  heal_value: 24000.0
   probability: 0.333
-  timing_mean_offset_s: -3.56
+  timing_mean_offset_s: 5.62
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e18_45955_258
-  skill_name: ハート・オブ・ライト
-  source_role: tank
-  target_channel: party
-  stack_group: null
-  shield_stack_group: null
-  duration_s: 15.0
-  mitigation_all: 0.0
-  mitigation_physical: 0.05
-  mitigation_magical: 0.1
-  shield_value: 0.0
-  heal_value: 0.0
-  probability: 0.333
-  timing_mean_offset_s: -1.2
-  timing_std_s: 1.0
-  sample_count: 3
-- event_id: e18_45955_258
-  skill_name: 運命の輪
+  skill_name: ピュアヒラ10%全体軽減
   source_role: healer
   target_channel: party
   stack_group: null
@@ -1873,7 +2289,23 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e19_45938_272
-  skill_name: ディヴァインヴェール
+  skill_name: アサイズ/ラプチャー等 (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 24000.0
+  probability: 0.667
+  timing_mean_offset_s: 4.22
+  timing_std_s: 0.49
+  sample_count: 3
+- event_id: e19_45938_272
+  skill_name: タンク全体バリア (90s)
   source_role: tank
   target_channel: party
   stack_group: null
@@ -1921,7 +2353,23 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e19_45938_272
-  skill_name: ダークミッショナリー
+  skill_name: インドゥルゲンティア
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 10.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 14000.0
+  probability: 0.333
+  timing_mean_offset_s: 6.36
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e19_45938_272
+  skill_name: タンク全体軽減 (90s)
   source_role: tank
   target_channel: party
   stack_group: null
@@ -1985,7 +2433,7 @@ partner_profile:
   timing_std_s: 0.36
   sample_count: 3
 - event_id: e1_45956_11
-  skill_name: ディヴァインヴェール
+  skill_name: タンク全体バリア (90s)
   source_role: tank
   target_channel: party
   stack_group: null
@@ -2001,7 +2449,7 @@ partner_profile:
   timing_std_s: 0.73
   sample_count: 3
 - event_id: e1_45956_11
-  skill_name: ハート・オブ・ライト
+  skill_name: タンク全体軽減 (90s)
   source_role: tank
   target_channel: party
   stack_group: null
@@ -2017,7 +2465,23 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e1_45956_11
-  skill_name: アサイラム
+  skill_name: アサイズ (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 22000.0
+  probability: 0.333
+  timing_mean_offset_s: -0.98
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e1_45956_11
+  skill_name: ピュアヒラ範囲HoT/設置
   source_role: healer
   target_channel: party
   stack_group: null
@@ -2027,13 +2491,13 @@ partner_profile:
   mitigation_physical: 0.0
   mitigation_magical: 0.0
   shield_value: 0.0
-  heal_value: 32000.0
+  heal_value: 34000.0
   probability: 0.333
   timing_mean_offset_s: 1.06
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e1_45956_11
-  skill_name: サンサイン
+  skill_name: ピュアヒラ10%全体軽減2
   source_role: healer
   target_channel: party
   stack_group: null
@@ -2049,7 +2513,7 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e1_45956_11
-  skill_name: 運命の輪
+  skill_name: ピュアヒラ10%全体軽減
   source_role: healer
   target_channel: party
   stack_group: null
@@ -2081,6 +2545,22 @@ partner_profile:
   timing_std_s: 3.44
   sample_count: 3
 - event_id: e20_45926_285
+  skill_name: アサイズ/ラプチャー等 (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 24000.0
+  probability: 0.667
+  timing_mean_offset_s: 3.32
+  timing_std_s: 2.08
+  sample_count: 3
+- event_id: e20_45926_285
   skill_name: リプライザル
   source_role: tank
   target_channel: boss
@@ -2097,6 +2577,38 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e20_45926_285
+  skill_name: アサイズ (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 22000.0
+  probability: 0.333
+  timing_mean_offset_s: 6.06
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e20_45926_285
+  skill_name: ディヴァインベニゾン
+  source_role: healer
+  target_channel: mt
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 15.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 26000.0
+  heal_value: 0.0
+  probability: 0.333
+  timing_mean_offset_s: -7.45
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e20_45926_285
   skill_name: ニュートラルセクト
   source_role: healer
   target_channel: party
@@ -2106,8 +2618,8 @@ partner_profile:
   mitigation_all: 0.0
   mitigation_physical: 0.0
   mitigation_magical: 0.0
-  shield_value: 16000.0
-  heal_value: 16000.0
+  shield_value: 20000.0
+  heal_value: 18000.0
   probability: 0.333
   timing_mean_offset_s: -3.1
   timing_std_s: 1.0
@@ -2129,7 +2641,23 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e21_45963_297
-  skill_name: ブラックナイト
+  skill_name: タンク短バフ (25s)
+  source_role: tank
+  target_channel: st
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 8.0
+  mitigation_all: 0.25
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 0.0
+  probability: 0.667
+  timing_mean_offset_s: -3.29
+  timing_std_s: 0.32
+  sample_count: 3
+- event_id: e21_45963_297
+  skill_name: タンク短バリア (TBN)
   source_role: tank
   target_channel: mt
   stack_group: null
@@ -2138,11 +2666,43 @@ partner_profile:
   mitigation_all: 0.0
   mitigation_physical: 0.0
   mitigation_magical: 0.0
-  shield_value: 45000.0
+  shield_value: 55000.0
   heal_value: 0.0
-  probability: 1.0
+  probability: 0.667
   timing_mean_offset_s: -3.81
-  timing_std_s: 0.52
+  timing_std_s: 0.64
+  sample_count: 3
+- event_id: e21_45963_297
+  skill_name: タンク補助軽減
+  source_role: tank
+  target_channel: mt
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 10.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.1
+  mitigation_magical: 0.2
+  shield_value: 0.0
+  heal_value: 0.0
+  probability: 0.667
+  timing_mean_offset_s: -4.19
+  timing_std_s: 0.92
+  sample_count: 3
+- event_id: e21_45963_297
+  skill_name: ディヴァインベニゾン
+  source_role: healer
+  target_channel: mt
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 15.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 26000.0
+  heal_value: 0.0
+  probability: 0.333
+  timing_mean_offset_s: -7.72
+  timing_std_s: 1.0
   sample_count: 3
 - event_id: e21_45963_297
   skill_name: ランパート
@@ -2156,25 +2716,9 @@ partner_profile:
   mitigation_magical: 0.0
   shield_value: 0.0
   heal_value: 0.0
-  probability: 0.667
-  timing_mean_offset_s: -3.44
-  timing_std_s: 0.44
-  sample_count: 3
-- event_id: e21_45963_297
-  skill_name: ホーリーシェルトロン
-  source_role: tank
-  target_channel: mt
-  stack_group: null
-  shield_stack_group: null
-  duration_s: 8.0
-  mitigation_all: 0.28
-  mitigation_physical: 0.0
-  mitigation_magical: 0.0
-  shield_value: 0.0
-  heal_value: 0.0
-  probability: 0.667
-  timing_mean_offset_s: -3.29
-  timing_std_s: 0.32
+  probability: 0.333
+  timing_mean_offset_s: -3.88
+  timing_std_s: 1.0
   sample_count: 3
 - event_id: e21_45963_297
   skill_name: アクアヴェール
@@ -2193,29 +2737,45 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e21_45963_297
-  skill_name: カモフラージュ
+  skill_name: タンク短バリア (TBN)
   source_role: tank
-  target_channel: mt
+  target_channel: st
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 7.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 55000.0
+  heal_value: 0.0
+  probability: 0.333
+  timing_mean_offset_s: -3.8
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e21_45963_297
+  skill_name: ランパート
+  source_role: tank
+  target_channel: st
   stack_group: null
   shield_stack_group: null
   duration_s: 20.0
-  mitigation_all: 0.1
+  mitigation_all: 0.2
   mitigation_physical: 0.0
   mitigation_magical: 0.0
   shield_value: 0.0
   heal_value: 0.0
   probability: 0.333
-  timing_mean_offset_s: -3.27
+  timing_mean_offset_s: -3.0
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e21_45963_297
-  skill_name: ハート・オブ・コランダム
+  skill_name: タンク短バフ (25s)
   source_role: tank
   target_channel: mt
   stack_group: null
   shield_stack_group: null
   duration_s: 8.0
-  mitigation_all: 0.28
+  mitigation_all: 0.25
   mitigation_physical: 0.0
   mitigation_magical: 0.0
   shield_value: 0.0
@@ -2225,23 +2785,23 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e21_45963_297
-  skill_name: ダークマインド
-  source_role: tank
-  target_channel: mt
+  skill_name: アサイズ (範囲即時戻し)
+  source_role: healer
+  target_channel: party
   stack_group: null
   shield_stack_group: null
-  duration_s: 10.0
+  duration_s: 0.0
   mitigation_all: 0.0
-  mitigation_physical: 0.1
-  mitigation_magical: 0.2
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
   shield_value: 0.0
-  heal_value: 0.0
+  heal_value: 22000.0
   probability: 0.333
-  timing_mean_offset_s: -5.11
+  timing_mean_offset_s: 2.26
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e21_45963_297
-  skill_name: サンサイン
+  skill_name: ピュアヒラ10%全体軽減2
   source_role: healer
   target_channel: party
   stack_group: null
@@ -2257,23 +2817,39 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e22_45956_307
-  skill_name: アサイラム
+  skill_name: ピュアヒラ範囲HoT/設置
   source_role: healer
   target_channel: party
   stack_group: null
   shield_stack_group: null
-  duration_s: 24.0
+  duration_s: 10.0
   mitigation_all: 0.0
   mitigation_physical: 0.0
   mitigation_magical: 0.0
   shield_value: 0.0
-  heal_value: 32000.0
+  heal_value: 34000.0
+  probability: 0.667
+  timing_mean_offset_s: 1.59
+  timing_std_s: 2.13
+  sample_count: 3
+- event_id: e22_45956_307
+  skill_name: アサイズ/ラプチャー等 (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 24000.0
   probability: 0.333
-  timing_mean_offset_s: -0.54
+  timing_mean_offset_s: 2.63
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e22_45956_307
-  skill_name: テンパランス
+  skill_name: ピュアヒラ10%全体軽減
   source_role: healer
   target_channel: party
   stack_group: null
@@ -2289,7 +2865,7 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e23_45932_313
-  skill_name: オブレーション
+  skill_name: タンク補助軽減
   source_role: tank
   target_channel: mt
   stack_group: null
@@ -2301,11 +2877,11 @@ partner_profile:
   shield_value: 0.0
   heal_value: 0.0
   probability: 0.667
-  timing_mean_offset_s: -3.58
-  timing_std_s: 0.03
+  timing_mean_offset_s: -4.05
+  timing_std_s: 0.5
   sample_count: 3
 - event_id: e23_45932_313
-  skill_name: ブラックナイト
+  skill_name: タンク短バリア (TBN)
   source_role: tank
   target_channel: mt
   stack_group: null
@@ -2314,30 +2890,46 @@ partner_profile:
   mitigation_all: 0.0
   mitigation_physical: 0.0
   mitigation_magical: 0.0
-  shield_value: 45000.0
+  shield_value: 55000.0
   heal_value: 0.0
   probability: 0.667
   timing_mean_offset_s: -1.71
   timing_std_s: 0.06
   sample_count: 3
 - event_id: e23_45932_313
-  skill_name: ダークマインド
-  source_role: tank
+  skill_name: ディヴァインベニゾン
+  source_role: healer
   target_channel: mt
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 15.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 26000.0
+  heal_value: 0.0
+  probability: 0.333
+  timing_mean_offset_s: -4.1
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e23_45932_313
+  skill_name: インドゥルゲンティア
+  source_role: healer
+  target_channel: party
   stack_group: null
   shield_stack_group: null
   duration_s: 10.0
   mitigation_all: 0.0
-  mitigation_physical: 0.1
-  mitigation_magical: 0.2
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
   shield_value: 0.0
-  heal_value: 0.0
+  heal_value: 14000.0
   probability: 0.333
-  timing_mean_offset_s: -4.55
+  timing_mean_offset_s: 1.65
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e23_45932_313
-  skill_name: テンパランス
+  skill_name: ピュアヒラ10%全体軽減
   source_role: healer
   target_channel: party
   stack_group: null
@@ -2350,6 +2942,22 @@ partner_profile:
   heal_value: 0.0
   probability: 0.333
   timing_mean_offset_s: -10.94
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e23_45932_313
+  skill_name: ディヴァインカレス (全体バリア+HoT)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 15.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 24000.0
+  heal_value: 16000.0
+  probability: 0.333
+  timing_mean_offset_s: -3.76
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e23_45932_313
@@ -2369,13 +2977,45 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e23_45932_313
-  skill_name: ホーリーシェルトロン
-  source_role: tank
+  skill_name: アサイズ/ラプチャー等 (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 24000.0
+  probability: 0.333
+  timing_mean_offset_s: 3.77
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e23_45932_313
+  skill_name: テトラグラマトン
+  source_role: healer
   target_channel: mt
   stack_group: null
   shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 36000.0
+  probability: 0.333
+  timing_mean_offset_s: 4.8
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e23_45932_313
+  skill_name: タンク短バフ (25s)
+  source_role: tank
+  target_channel: st
+  stack_group: null
+  shield_stack_group: null
   duration_s: 8.0
-  mitigation_all: 0.28
+  mitigation_all: 0.25
   mitigation_physical: 0.0
   mitigation_magical: 0.0
   shield_value: 0.0
@@ -2385,23 +3025,7 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e24_45963_315
-  skill_name: ダークマインド
-  source_role: tank
-  target_channel: mt
-  stack_group: null
-  shield_stack_group: null
-  duration_s: 10.0
-  mitigation_all: 0.0
-  mitigation_physical: 0.1
-  mitigation_magical: 0.2
-  shield_value: 0.0
-  heal_value: 0.0
-  probability: 0.667
-  timing_mean_offset_s: -3.45
-  timing_std_s: 2.76
-  sample_count: 3
-- event_id: e24_45963_315
-  skill_name: オブレーション
+  skill_name: タンク補助軽減
   source_role: tank
   target_channel: mt
   stack_group: null
@@ -2413,11 +3037,11 @@ partner_profile:
   shield_value: 0.0
   heal_value: 0.0
   probability: 0.667
-  timing_mean_offset_s: -5.23
-  timing_std_s: 0.03
+  timing_mean_offset_s: -5.7
+  timing_std_s: 0.5
   sample_count: 3
 - event_id: e24_45963_315
-  skill_name: ブラックナイト
+  skill_name: タンク短バリア (TBN)
   source_role: tank
   target_channel: mt
   stack_group: null
@@ -2426,11 +3050,75 @@ partner_profile:
   mitigation_all: 0.0
   mitigation_physical: 0.0
   mitigation_magical: 0.0
-  shield_value: 45000.0
+  shield_value: 55000.0
   heal_value: 0.0
   probability: 0.667
   timing_mean_offset_s: -3.36
   timing_std_s: 0.06
+  sample_count: 3
+- event_id: e24_45963_315
+  skill_name: テトラグラマトン
+  source_role: healer
+  target_channel: mt
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 36000.0
+  probability: 0.667
+  timing_mean_offset_s: 5.31
+  timing_std_s: 2.17
+  sample_count: 3
+- event_id: e24_45963_315
+  skill_name: ディヴァインベニゾン
+  source_role: healer
+  target_channel: mt
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 15.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 26000.0
+  heal_value: 0.0
+  probability: 0.333
+  timing_mean_offset_s: -5.75
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e24_45963_315
+  skill_name: インドゥルゲンティア
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 10.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 14000.0
+  probability: 0.333
+  timing_mean_offset_s: -0.0
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e24_45963_315
+  skill_name: ディヴァインカレス (全体バリア+HoT)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 15.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 24000.0
+  heal_value: 16000.0
+  probability: 0.333
+  timing_mean_offset_s: -5.41
+  timing_std_s: 1.0
   sample_count: 3
 - event_id: e24_45963_315
   skill_name: ランパート
@@ -2449,19 +3137,83 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e24_45963_315
-  skill_name: ホーリーシェルトロン
+  skill_name: タンク補助軽減
   source_role: tank
-  target_channel: mt
+  target_channel: st
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 10.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.1
+  mitigation_magical: 0.2
+  shield_value: 0.0
+  heal_value: 0.0
+  probability: 0.333
+  timing_mean_offset_s: -0.69
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e24_45963_315
+  skill_name: アサイズ/ラプチャー等 (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 24000.0
+  probability: 0.333
+  timing_mean_offset_s: 2.12
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e24_45963_315
+  skill_name: タンク短バフ (25s)
+  source_role: tank
+  target_channel: st
   stack_group: null
   shield_stack_group: null
   duration_s: 8.0
-  mitigation_all: 0.28
+  mitigation_all: 0.25
   mitigation_physical: 0.0
   mitigation_magical: 0.0
   shield_value: 0.0
   heal_value: 0.0
   probability: 0.333
   timing_mean_offset_s: -4.5
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e25_45956_325
+  skill_name: アサイズ/ラプチャー等 (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 24000.0
+  probability: 0.667
+  timing_mean_offset_s: 3.88
+  timing_std_s: 0.35
+  sample_count: 3
+- event_id: e25_45956_325
+  skill_name: テトラグラマトン
+  source_role: healer
+  target_channel: mt
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 36000.0
+  probability: 0.333
+  timing_mean_offset_s: -1.52
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e25_45956_325
@@ -2481,9 +3233,9 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e25_45956_325
-  skill_name: ダークマインド
+  skill_name: タンク補助軽減
   source_role: tank
-  target_channel: mt
+  target_channel: st
   stack_group: null
   shield_stack_group: null
   duration_s: 10.0
@@ -2497,7 +3249,23 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e25_45956_325
-  skill_name: アサイラム
+  skill_name: ディヴァインベニゾン
+  source_role: healer
+  target_channel: mt
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 15.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 26000.0
+  heal_value: 0.0
+  probability: 0.333
+  timing_mean_offset_s: -5.19
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e25_45956_325
+  skill_name: ピュアヒラ範囲HoT/設置
   source_role: healer
   target_channel: party
   stack_group: null
@@ -2507,7 +3275,7 @@ partner_profile:
   mitigation_physical: 0.0
   mitigation_magical: 0.0
   shield_value: 0.0
-  heal_value: 32000.0
+  heal_value: 34000.0
   probability: 0.333
   timing_mean_offset_s: 0.15
   timing_std_s: 1.0
@@ -2529,7 +3297,7 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e25_45956_325
-  skill_name: 運命の輪
+  skill_name: ピュアヒラ10%全体軽減
   source_role: healer
   target_channel: party
   stack_group: null
@@ -2545,29 +3313,13 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e26_45963_333
-  skill_name: ブラックナイト
+  skill_name: タンク短バフ (25s)
   source_role: tank
-  target_channel: mt
-  stack_group: null
-  shield_stack_group: null
-  duration_s: 7.0
-  mitigation_all: 0.0
-  mitigation_physical: 0.0
-  mitigation_magical: 0.0
-  shield_value: 45000.0
-  heal_value: 0.0
-  probability: 1.0
-  timing_mean_offset_s: -4.43
-  timing_std_s: 0.99
-  sample_count: 3
-- event_id: e26_45963_333
-  skill_name: ホーリーシェルトロン
-  source_role: tank
-  target_channel: mt
+  target_channel: st
   stack_group: null
   shield_stack_group: null
   duration_s: 8.0
-  mitigation_all: 0.28
+  mitigation_all: 0.25
   mitigation_physical: 0.0
   mitigation_magical: 0.0
   shield_value: 0.0
@@ -2577,9 +3329,57 @@ partner_profile:
   timing_std_s: 0.7
   sample_count: 3
 - event_id: e26_45963_333
-  skill_name: オブレーション
+  skill_name: タンク短バリア (TBN)
   source_role: tank
   target_channel: mt
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 7.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 55000.0
+  heal_value: 0.0
+  probability: 0.667
+  timing_mean_offset_s: -3.73
+  timing_std_s: 0.13
+  sample_count: 3
+- event_id: e26_45963_333
+  skill_name: アサイズ (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 22000.0
+  probability: 0.667
+  timing_mean_offset_s: 3.33
+  timing_std_s: 3.78
+  sample_count: 3
+- event_id: e26_45963_333
+  skill_name: タンク短バリア (TBN)
+  source_role: tank
+  target_channel: st
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 7.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 55000.0
+  heal_value: 0.0
+  probability: 0.333
+  timing_mean_offset_s: -5.82
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e26_45963_333
+  skill_name: タンク補助軽減
+  source_role: tank
+  target_channel: st
   stack_group: null
   shield_stack_group: null
   duration_s: 10.0
@@ -2588,18 +3388,18 @@ partner_profile:
   mitigation_magical: 0.0
   shield_value: 0.0
   heal_value: 0.0
-  probability: 0.667
-  timing_mean_offset_s: -3.48
-  timing_std_s: 0.33
+  probability: 0.333
+  timing_mean_offset_s: -3.81
+  timing_std_s: 1.0
   sample_count: 3
 - event_id: e26_45963_333
-  skill_name: ハート・オブ・コランダム
+  skill_name: タンク短バフ (25s)
   source_role: tank
   target_channel: mt
   stack_group: null
   shield_stack_group: null
   duration_s: 8.0
-  mitigation_all: 0.28
+  mitigation_all: 0.25
   mitigation_physical: 0.0
   mitigation_magical: 0.0
   shield_value: 0.0
@@ -2609,7 +3409,23 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e26_45963_333
-  skill_name: 運命の輪
+  skill_name: アサイズ/ラプチャー等 (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 24000.0
+  probability: 0.333
+  timing_mean_offset_s: 6.44
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e26_45963_333
+  skill_name: ピュアヒラ10%全体軽減
   source_role: healer
   target_channel: party
   stack_group: null
@@ -2625,7 +3441,7 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e26_45963_333
-  skill_name: シャドウヴィジル
+  skill_name: タンク40%大バフ
   source_role: tank
   target_channel: mt
   stack_group: null
@@ -2638,6 +3454,22 @@ partner_profile:
   heal_value: 0.0
   probability: 0.333
   timing_mean_offset_s: -5.38
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e26_45963_333
+  skill_name: タンク補助軽減
+  source_role: tank
+  target_channel: mt
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 10.0
+  mitigation_all: 0.1
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 0.0
+  probability: 0.333
+  timing_mean_offset_s: -3.15
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e27_45926_357
@@ -2689,7 +3521,23 @@ partner_profile:
   timing_std_s: 0.7
   sample_count: 3
 - event_id: e27_45926_357
-  skill_name: テンパランス
+  skill_name: ディヴァインベニゾン
+  source_role: healer
+  target_channel: mt
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 15.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 26000.0
+  heal_value: 0.0
+  probability: 0.667
+  timing_mean_offset_s: -6.63
+  timing_std_s: 2.03
+  sample_count: 3
+- event_id: e27_45926_357
+  skill_name: ピュアヒラ10%全体軽減
   source_role: healer
   target_channel: party
   stack_group: null
@@ -2705,7 +3553,23 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e27_45926_357
-  skill_name: ダークミッショナリー
+  skill_name: アサイズ/ラプチャー等 (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 24000.0
+  probability: 0.333
+  timing_mean_offset_s: 1.74
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e27_45926_357
+  skill_name: タンク全体軽減 (90s)
   source_role: tank
   target_channel: party
   stack_group: null
@@ -2721,9 +3585,9 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e27_45926_357
-  skill_name: オブレーション
+  skill_name: タンク補助軽減
   source_role: tank
-  target_channel: mt
+  target_channel: st
   stack_group: null
   shield_stack_group: null
   duration_s: 10.0
@@ -2753,23 +3617,23 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e27_45926_357
-  skill_name: ハート・オブ・ライト
-  source_role: tank
+  skill_name: メディガ (範囲戻し+HoT)
+  source_role: healer
   target_channel: party
   stack_group: null
   shield_stack_group: null
   duration_s: 15.0
   mitigation_all: 0.0
-  mitigation_physical: 0.05
-  mitigation_magical: 0.1
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
   shield_value: 0.0
-  heal_value: 0.0
+  heal_value: 32000.0
   probability: 0.333
-  timing_mean_offset_s: -3.4
+  timing_mean_offset_s: 0.88
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e27_45926_357
-  skill_name: ブラックナイト
+  skill_name: タンク短バリア (TBN)
   source_role: tank
   target_channel: mt
   stack_group: null
@@ -2778,14 +3642,14 @@ partner_profile:
   mitigation_all: 0.0
   mitigation_physical: 0.0
   mitigation_magical: 0.0
-  shield_value: 45000.0
+  shield_value: 55000.0
   heal_value: 0.0
   probability: 0.333
   timing_mean_offset_s: -2.47
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e28_45933_372
-  skill_name: ダークミッショナリー
+  skill_name: タンク全体軽減 (90s)
   source_role: tank
   target_channel: party
   stack_group: null
@@ -2817,6 +3681,22 @@ partner_profile:
   timing_std_s: 0.3
   sample_count: 3
 - event_id: e28_45933_372
+  skill_name: アサイズ/ラプチャー等 (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 24000.0
+  probability: 0.667
+  timing_mean_offset_s: 0.55
+  timing_std_s: 0.95
+  sample_count: 3
+- event_id: e28_45933_372
   skill_name: リプライザル
   source_role: tank
   target_channel: boss
@@ -2833,7 +3713,55 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e28_45933_372
-  skill_name: ディヴァインヴェール
+  skill_name: ディヴァインカレス (全体バリア+HoT)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 15.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 24000.0
+  heal_value: 16000.0
+  probability: 0.333
+  timing_mean_offset_s: -3.79
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e28_45933_372
+  skill_name: アサイズ (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 22000.0
+  probability: 0.333
+  timing_mean_offset_s: 1.2
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e28_45933_372
+  skill_name: メディガ (範囲戻し+HoT)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 15.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 32000.0
+  probability: 0.333
+  timing_mean_offset_s: 4.48
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e28_45933_372
+  skill_name: タンク全体バリア (90s)
   source_role: tank
   target_channel: party
   stack_group: null
@@ -2847,6 +3775,38 @@ partner_profile:
   probability: 0.333
   timing_mean_offset_s: -3.72
   timing_std_s: 1.0
+  sample_count: 3
+- event_id: e28_45933_372
+  skill_name: ピュアヒラ範囲HoT/設置
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 10.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 34000.0
+  probability: 0.333
+  timing_mean_offset_s: 6.18
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e29_45936_391
+  skill_name: メディガ (範囲戻し+HoT)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 15.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 32000.0
+  probability: 0.667
+  timing_mean_offset_s: 4.4
+  timing_std_s: 0.34
   sample_count: 3
 - event_id: e29_45936_391
   skill_name: リプライザル
@@ -2865,7 +3825,7 @@ partner_profile:
   timing_std_s: 1.65
   sample_count: 3
 - event_id: e29_45936_391
-  skill_name: ディヴァインヴェール
+  skill_name: タンク全体バリア (90s)
   source_role: tank
   target_channel: party
   stack_group: null
@@ -2881,7 +3841,7 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e29_45936_391
-  skill_name: オブレーション
+  skill_name: タンク補助軽減
   source_role: tank
   target_channel: mt
   stack_group: null
@@ -2897,19 +3857,35 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e29_45936_391
-  skill_name: ダークマインド
-  source_role: tank
+  skill_name: ピュアヒラ範囲HoT/設置
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 24.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 34000.0
+  probability: 0.333
+  timing_mean_offset_s: 5.88
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e29_45936_391
+  skill_name: ディヴァインベニゾン
+  source_role: healer
   target_channel: mt
   stack_group: null
   shield_stack_group: null
-  duration_s: 10.0
+  duration_s: 15.0
   mitigation_all: 0.0
-  mitigation_physical: 0.1
-  mitigation_magical: 0.2
-  shield_value: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 26000.0
   heal_value: 0.0
   probability: 0.333
-  timing_mean_offset_s: -1.25
+  timing_mean_offset_s: -10.93
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e29_45936_391
@@ -2929,7 +3905,7 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e2_45951_21
-  skill_name: シャドウヴィジル
+  skill_name: タンク40%大バフ
   source_role: tank
   target_channel: mt
   stack_group: null
@@ -2941,49 +3917,49 @@ partner_profile:
   shield_value: 0.0
   heal_value: 0.0
   probability: 1.0
-  timing_mean_offset_s: -4.55
-  timing_std_s: 2.62
+  timing_mean_offset_s: -5.59
+  timing_std_s: 3.26
   sample_count: 3
 - event_id: e2_45951_21
-  skill_name: ブラックナイト
-  source_role: tank
+  skill_name: ディヴァインベニゾン
+  source_role: healer
   target_channel: mt
   stack_group: null
   shield_stack_group: null
-  duration_s: 7.0
+  duration_s: 15.0
   mitigation_all: 0.0
   mitigation_physical: 0.0
   mitigation_magical: 0.0
-  shield_value: 45000.0
+  shield_value: 26000.0
   heal_value: 0.0
   probability: 0.667
-  timing_mean_offset_s: -2.5
-  timing_std_s: 0.23
+  timing_mean_offset_s: -3.66
+  timing_std_s: 1.96
   sample_count: 3
 - event_id: e2_45951_21
-  skill_name: ダークマインド
+  skill_name: タンク40%大バフ
   source_role: tank
-  target_channel: mt
+  target_channel: st
   stack_group: null
   shield_stack_group: null
-  duration_s: 10.0
-  mitigation_all: 0.0
-  mitigation_physical: 0.1
-  mitigation_magical: 0.2
-  shield_value: 0.0
+  duration_s: 15.0
+  mitigation_all: 0.4
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 12000.0
   heal_value: 0.0
   probability: 0.667
-  timing_mean_offset_s: -3.79
-  timing_std_s: 1.69
+  timing_mean_offset_s: -3.93
+  timing_std_s: 1.39
   sample_count: 3
 - event_id: e2_45951_21
-  skill_name: ホーリーシェルトロン
+  skill_name: タンク短バフ (25s)
   source_role: tank
-  target_channel: mt
+  target_channel: st
   stack_group: null
   shield_stack_group: null
   duration_s: 8.0
-  mitigation_all: 0.28
+  mitigation_all: 0.25
   mitigation_physical: 0.0
   mitigation_magical: 0.0
   shield_value: 0.0
@@ -2995,7 +3971,7 @@ partner_profile:
 - event_id: e2_45951_21
   skill_name: ランパート
   source_role: tank
-  target_channel: mt
+  target_channel: st
   stack_group: null
   shield_stack_group: null
   duration_s: 20.0
@@ -3009,7 +3985,7 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e2_45951_21
-  skill_name: ハート・オブ・ライト
+  skill_name: タンク全体軽減 (90s)
   source_role: tank
   target_channel: party
   stack_group: null
@@ -3022,22 +3998,6 @@ partner_profile:
   heal_value: 0.0
   probability: 0.333
   timing_mean_offset_s: -11.59
-  timing_std_s: 1.0
-  sample_count: 3
-- event_id: e2_45951_21
-  skill_name: グレートネビュラ
-  source_role: tank
-  target_channel: mt
-  stack_group: null
-  shield_stack_group: null
-  duration_s: 15.0
-  mitigation_all: 0.4
-  mitigation_physical: 0.0
-  mitigation_magical: 0.0
-  shield_value: 0.0
-  heal_value: 0.0
-  probability: 0.333
-  timing_mean_offset_s: -8.43
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e2_45951_21
@@ -3057,13 +4017,45 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e2_45951_21
-  skill_name: ハート・オブ・コランダム
+  skill_name: タンク短バリア (TBN)
+  source_role: tank
+  target_channel: st
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 7.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 55000.0
+  heal_value: 0.0
+  probability: 0.333
+  timing_mean_offset_s: -2.73
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e2_45951_21
+  skill_name: タンク補助軽減
+  source_role: tank
+  target_channel: st
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 10.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.1
+  mitigation_magical: 0.2
+  shield_value: 0.0
+  heal_value: 0.0
+  probability: 0.333
+  timing_mean_offset_s: -2.11
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e2_45951_21
+  skill_name: タンク短バフ (25s)
   source_role: tank
   target_channel: mt
   stack_group: null
   shield_stack_group: null
   duration_s: 8.0
-  mitigation_all: 0.28
+  mitigation_all: 0.25
   mitigation_physical: 0.0
   mitigation_magical: 0.0
   shield_value: 0.0
@@ -3073,7 +4065,7 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e2_45951_21
-  skill_name: 運命の輪
+  skill_name: ピュアヒラ10%全体軽減
   source_role: healer
   target_channel: party
   stack_group: null
@@ -3089,7 +4081,7 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e2_45951_21
-  skill_name: ディヴァインヴェール
+  skill_name: タンク全体バリア (90s)
   source_role: tank
   target_channel: party
   stack_group: null
@@ -3121,39 +4113,39 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e2_45951_21
-  skill_name: オブレーション
+  skill_name: タンク補助軽減
   source_role: tank
   target_channel: mt
   stack_group: null
   shield_stack_group: null
   duration_s: 10.0
-  mitigation_all: 0.1
-  mitigation_physical: 0.0
-  mitigation_magical: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.1
+  mitigation_magical: 0.2
   shield_value: 0.0
   heal_value: 0.0
   probability: 0.333
-  timing_mean_offset_s: -4.86
+  timing_mean_offset_s: -5.48
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e2_45951_21
-  skill_name: ガーディアン
+  skill_name: タンク短バリア (TBN)
   source_role: tank
   target_channel: mt
   stack_group: null
   shield_stack_group: null
-  duration_s: 15.0
-  mitigation_all: 0.4
+  duration_s: 7.0
+  mitigation_all: 0.0
   mitigation_physical: 0.0
   mitigation_magical: 0.0
-  shield_value: 22000.0
+  shield_value: 55000.0
   heal_value: 0.0
   probability: 0.333
-  timing_mean_offset_s: -2.54
+  timing_mean_offset_s: -2.27
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e2_45951_21
-  skill_name: インターベンション
+  skill_name: 相方タンク投げバフ
   source_role: tank
   target_channel: st
   stack_group: null
@@ -3171,7 +4163,7 @@ partner_profile:
 - event_id: e30_45977_405
   skill_name: ランパート
   source_role: tank
-  target_channel: mt
+  target_channel: st
   stack_group: null
   shield_stack_group: null
   duration_s: 20.0
@@ -3185,7 +4177,23 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e30_45977_405
-  skill_name: マクロコスモス
+  skill_name: アサイズ/ラプチャー等 (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 24000.0
+  probability: 0.333
+  timing_mean_offset_s: -0.59
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e30_45977_405
+  skill_name: ピュアヒラ大戻し (ベル/マクロ)
   source_role: healer
   target_channel: party
   stack_group: null
@@ -3195,13 +4203,13 @@ partner_profile:
   mitigation_physical: 0.0
   mitigation_magical: 0.0
   shield_value: 0.0
-  heal_value: 38000.0
+  heal_value: 45000.0
   probability: 0.333
   timing_mean_offset_s: -1.75
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e30_45977_405
-  skill_name: ブラックナイト
+  skill_name: タンク短バリア (TBN)
   source_role: tank
   target_channel: mt
   stack_group: null
@@ -3210,10 +4218,58 @@ partner_profile:
   mitigation_all: 0.0
   mitigation_physical: 0.0
   mitigation_magical: 0.0
-  shield_value: 45000.0
+  shield_value: 55000.0
   heal_value: 0.0
   probability: 0.333
   timing_mean_offset_s: -1.48
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e31_45977_408
+  skill_name: ランパート
+  source_role: tank
+  target_channel: st
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 20.0
+  mitigation_all: 0.2
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 0.0
+  probability: 0.667
+  timing_mean_offset_s: -2.47
+  timing_std_s: 1.73
+  sample_count: 3
+- event_id: e31_45977_408
+  skill_name: タンク短バフ (25s)
+  source_role: tank
+  target_channel: st
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 8.0
+  mitigation_all: 0.25
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 0.0
+  probability: 0.667
+  timing_mean_offset_s: -1.04
+  timing_std_s: 0.97
+  sample_count: 3
+- event_id: e31_45977_408
+  skill_name: アサイズ (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 22000.0
+  probability: 0.333
+  timing_mean_offset_s: 5.57
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e31_45977_408
@@ -3228,34 +4284,18 @@ partner_profile:
   mitigation_magical: 0.0
   shield_value: 0.0
   heal_value: 0.0
-  probability: 1.0
-  timing_mean_offset_s: -2.11
-  timing_std_s: 1.5
+  probability: 0.333
+  timing_mean_offset_s: -1.39
+  timing_std_s: 1.0
   sample_count: 3
 - event_id: e31_45977_408
-  skill_name: ホーリーシェルトロン
+  skill_name: タンク短バフ (25s)
   source_role: tank
   target_channel: mt
   stack_group: null
   shield_stack_group: null
   duration_s: 8.0
-  mitigation_all: 0.28
-  mitigation_physical: 0.0
-  mitigation_magical: 0.0
-  shield_value: 0.0
-  heal_value: 0.0
-  probability: 0.667
-  timing_mean_offset_s: -1.04
-  timing_std_s: 0.97
-  sample_count: 3
-- event_id: e31_45977_408
-  skill_name: ハート・オブ・コランダム
-  source_role: tank
-  target_channel: mt
-  stack_group: null
-  shield_stack_group: null
-  duration_s: 8.0
-  mitigation_all: 0.28
+  mitigation_all: 0.25
   mitigation_physical: 0.0
   mitigation_magical: 0.0
   shield_value: 0.0
@@ -3265,9 +4305,9 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e31_45977_408
-  skill_name: オブレーション
+  skill_name: タンク補助軽減
   source_role: tank
-  target_channel: mt
+  target_channel: st
   stack_group: null
   shield_stack_group: null
   duration_s: 10.0
@@ -3281,7 +4321,7 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e31_45977_408
-  skill_name: ブラックナイト
+  skill_name: タンク短バリア (TBN)
   source_role: tank
   target_channel: mt
   stack_group: null
@@ -3290,7 +4330,7 @@ partner_profile:
   mitigation_all: 0.0
   mitigation_physical: 0.0
   mitigation_magical: 0.0
-  shield_value: 45000.0
+  shield_value: 55000.0
   heal_value: 0.0
   probability: 0.333
   timing_mean_offset_s: -4.47
@@ -3299,7 +4339,7 @@ partner_profile:
 - event_id: e32_45982_410
   skill_name: ランパート
   source_role: tank
-  target_channel: mt
+  target_channel: st
   stack_group: null
   shield_stack_group: null
   duration_s: 20.0
@@ -3308,18 +4348,18 @@ partner_profile:
   mitigation_magical: 0.0
   shield_value: 0.0
   heal_value: 0.0
-  probability: 1.0
-  timing_mean_offset_s: -4.38
-  timing_std_s: 1.5
+  probability: 0.667
+  timing_mean_offset_s: -4.74
+  timing_std_s: 1.73
   sample_count: 3
 - event_id: e32_45982_410
-  skill_name: ホーリーシェルトロン
+  skill_name: タンク短バフ (25s)
   source_role: tank
-  target_channel: mt
+  target_channel: st
   stack_group: null
   shield_stack_group: null
   duration_s: 8.0
-  mitigation_all: 0.28
+  mitigation_all: 0.25
   mitigation_physical: 0.0
   mitigation_magical: 0.0
   shield_value: 0.0
@@ -3329,13 +4369,45 @@ partner_profile:
   timing_std_s: 0.97
   sample_count: 3
 - event_id: e32_45982_410
-  skill_name: ハート・オブ・コランダム
+  skill_name: アサイズ (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 22000.0
+  probability: 0.333
+  timing_mean_offset_s: 3.3
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e32_45982_410
+  skill_name: ランパート
+  source_role: tank
+  target_channel: mt
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 20.0
+  mitigation_all: 0.2
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 0.0
+  probability: 0.333
+  timing_mean_offset_s: -3.66
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e32_45982_410
+  skill_name: タンク短バフ (25s)
   source_role: tank
   target_channel: mt
   stack_group: null
   shield_stack_group: null
   duration_s: 8.0
-  mitigation_all: 0.28
+  mitigation_all: 0.25
   mitigation_physical: 0.0
   mitigation_magical: 0.0
   shield_value: 0.0
@@ -3345,9 +4417,9 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e32_45982_410
-  skill_name: オブレーション
+  skill_name: タンク補助軽減
   source_role: tank
-  target_channel: mt
+  target_channel: st
   stack_group: null
   shield_stack_group: null
   duration_s: 10.0
@@ -3361,7 +4433,23 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e32_45982_410
-  skill_name: ブラックナイト
+  skill_name: ピュアヒラ範囲HoT/設置
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 24.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 34000.0
+  probability: 0.333
+  timing_mean_offset_s: 7.78
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e32_45982_410
+  skill_name: タンク短バリア (TBN)
   source_role: tank
   target_channel: mt
   stack_group: null
@@ -3370,10 +4458,58 @@ partner_profile:
   mitigation_all: 0.0
   mitigation_physical: 0.0
   mitigation_magical: 0.0
-  shield_value: 45000.0
+  shield_value: 55000.0
   heal_value: 0.0
   probability: 0.333
   timing_mean_offset_s: -6.74
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e33_47235_410
+  skill_name: ランパート
+  source_role: tank
+  target_channel: st
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 20.0
+  mitigation_all: 0.2
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 0.0
+  probability: 0.667
+  timing_mean_offset_s: -4.74
+  timing_std_s: 1.73
+  sample_count: 3
+- event_id: e33_47235_410
+  skill_name: タンク短バフ (25s)
+  source_role: tank
+  target_channel: st
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 8.0
+  mitigation_all: 0.25
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 0.0
+  probability: 0.667
+  timing_mean_offset_s: -3.31
+  timing_std_s: 0.97
+  sample_count: 3
+- event_id: e33_47235_410
+  skill_name: アサイズ (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 22000.0
+  probability: 0.333
+  timing_mean_offset_s: 3.3
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e33_47235_410
@@ -3388,34 +4524,18 @@ partner_profile:
   mitigation_magical: 0.0
   shield_value: 0.0
   heal_value: 0.0
-  probability: 1.0
-  timing_mean_offset_s: -4.38
-  timing_std_s: 1.5
+  probability: 0.333
+  timing_mean_offset_s: -3.66
+  timing_std_s: 1.0
   sample_count: 3
 - event_id: e33_47235_410
-  skill_name: ホーリーシェルトロン
+  skill_name: タンク短バフ (25s)
   source_role: tank
   target_channel: mt
   stack_group: null
   shield_stack_group: null
   duration_s: 8.0
-  mitigation_all: 0.28
-  mitigation_physical: 0.0
-  mitigation_magical: 0.0
-  shield_value: 0.0
-  heal_value: 0.0
-  probability: 0.667
-  timing_mean_offset_s: -3.31
-  timing_std_s: 0.97
-  sample_count: 3
-- event_id: e33_47235_410
-  skill_name: ハート・オブ・コランダム
-  source_role: tank
-  target_channel: mt
-  stack_group: null
-  shield_stack_group: null
-  duration_s: 8.0
-  mitigation_all: 0.28
+  mitigation_all: 0.25
   mitigation_physical: 0.0
   mitigation_magical: 0.0
   shield_value: 0.0
@@ -3425,9 +4545,9 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e33_47235_410
-  skill_name: オブレーション
+  skill_name: タンク補助軽減
   source_role: tank
-  target_channel: mt
+  target_channel: st
   stack_group: null
   shield_stack_group: null
   duration_s: 10.0
@@ -3441,7 +4561,23 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e33_47235_410
-  skill_name: ブラックナイト
+  skill_name: ピュアヒラ範囲HoT/設置
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 24.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 34000.0
+  probability: 0.333
+  timing_mean_offset_s: 7.78
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e33_47235_410
+  skill_name: タンク短バリア (TBN)
   source_role: tank
   target_channel: mt
   stack_group: null
@@ -3450,7 +4586,7 @@ partner_profile:
   mitigation_all: 0.0
   mitigation_physical: 0.0
   mitigation_magical: 0.0
-  shield_value: 45000.0
+  shield_value: 55000.0
   heal_value: 0.0
   probability: 0.333
   timing_mean_offset_s: -6.74
@@ -3459,7 +4595,7 @@ partner_profile:
 - event_id: e34_45979_411
   skill_name: ランパート
   source_role: tank
-  target_channel: mt
+  target_channel: st
   stack_group: null
   shield_stack_group: null
   duration_s: 20.0
@@ -3468,18 +4604,18 @@ partner_profile:
   mitigation_magical: 0.0
   shield_value: 0.0
   heal_value: 0.0
-  probability: 1.0
-  timing_mean_offset_s: -5.09
-  timing_std_s: 1.5
+  probability: 0.667
+  timing_mean_offset_s: -5.45
+  timing_std_s: 1.73
   sample_count: 3
 - event_id: e34_45979_411
-  skill_name: ホーリーシェルトロン
+  skill_name: タンク短バフ (25s)
   source_role: tank
-  target_channel: mt
+  target_channel: st
   stack_group: null
   shield_stack_group: null
   duration_s: 8.0
-  mitigation_all: 0.28
+  mitigation_all: 0.25
   mitigation_physical: 0.0
   mitigation_magical: 0.0
   shield_value: 0.0
@@ -3489,13 +4625,45 @@ partner_profile:
   timing_std_s: 0.97
   sample_count: 3
 - event_id: e34_45979_411
-  skill_name: ハート・オブ・コランダム
+  skill_name: アサイズ (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 22000.0
+  probability: 0.333
+  timing_mean_offset_s: 2.59
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e34_45979_411
+  skill_name: ランパート
+  source_role: tank
+  target_channel: mt
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 20.0
+  mitigation_all: 0.2
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 0.0
+  probability: 0.333
+  timing_mean_offset_s: -4.37
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e34_45979_411
+  skill_name: タンク短バフ (25s)
   source_role: tank
   target_channel: mt
   stack_group: null
   shield_stack_group: null
   duration_s: 8.0
-  mitigation_all: 0.28
+  mitigation_all: 0.25
   mitigation_physical: 0.0
   mitigation_magical: 0.0
   shield_value: 0.0
@@ -3505,9 +4673,121 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e34_45979_411
-  skill_name: オブレーション
+  skill_name: タンク補助軽減
+  source_role: tank
+  target_channel: st
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 10.0
+  mitigation_all: 0.1
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 0.0
+  probability: 0.333
+  timing_mean_offset_s: -2.99
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e34_45979_411
+  skill_name: ピュアヒラ範囲HoT/設置
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 24.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 34000.0
+  probability: 0.333
+  timing_mean_offset_s: 7.07
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e35_45977_411
+  skill_name: ランパート
+  source_role: tank
+  target_channel: st
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 20.0
+  mitigation_all: 0.2
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 0.0
+  probability: 0.667
+  timing_mean_offset_s: -5.45
+  timing_std_s: 1.73
+  sample_count: 3
+- event_id: e35_45977_411
+  skill_name: タンク短バフ (25s)
+  source_role: tank
+  target_channel: st
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 8.0
+  mitigation_all: 0.25
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 0.0
+  probability: 0.667
+  timing_mean_offset_s: -4.02
+  timing_std_s: 0.97
+  sample_count: 3
+- event_id: e35_45977_411
+  skill_name: アサイズ (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 22000.0
+  probability: 0.333
+  timing_mean_offset_s: 2.59
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e35_45977_411
+  skill_name: ランパート
   source_role: tank
   target_channel: mt
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 20.0
+  mitigation_all: 0.2
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 0.0
+  probability: 0.333
+  timing_mean_offset_s: -4.37
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e35_45977_411
+  skill_name: タンク短バフ (25s)
+  source_role: tank
+  target_channel: mt
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 8.0
+  mitigation_all: 0.25
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 0.0
+  probability: 0.333
+  timing_mean_offset_s: -3.57
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e35_45977_411
+  skill_name: タンク補助軽減
+  source_role: tank
+  target_channel: st
   stack_group: null
   shield_stack_group: null
   duration_s: 10.0
@@ -3521,93 +4801,45 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e35_45977_411
+  skill_name: ピュアヒラ範囲HoT/設置
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 24.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 34000.0
+  probability: 0.333
+  timing_mean_offset_s: 7.07
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e36_45979_414
   skill_name: ランパート
   source_role: tank
-  target_channel: mt
+  target_channel: st
   stack_group: null
   shield_stack_group: null
   duration_s: 20.0
   mitigation_all: 0.2
-  mitigation_physical: 0.0
-  mitigation_magical: 0.0
-  shield_value: 0.0
-  heal_value: 0.0
-  probability: 1.0
-  timing_mean_offset_s: -5.09
-  timing_std_s: 1.5
-  sample_count: 3
-- event_id: e35_45977_411
-  skill_name: ホーリーシェルトロン
-  source_role: tank
-  target_channel: mt
-  stack_group: null
-  shield_stack_group: null
-  duration_s: 8.0
-  mitigation_all: 0.28
   mitigation_physical: 0.0
   mitigation_magical: 0.0
   shield_value: 0.0
   heal_value: 0.0
   probability: 0.667
-  timing_mean_offset_s: -4.02
-  timing_std_s: 0.97
+  timing_mean_offset_s: -8.44
+  timing_std_s: 1.73
   sample_count: 3
-- event_id: e35_45977_411
-  skill_name: ハート・オブ・コランダム
+- event_id: e36_45979_414
+  skill_name: タンク短バフ (25s)
   source_role: tank
-  target_channel: mt
+  target_channel: st
   stack_group: null
   shield_stack_group: null
   duration_s: 8.0
-  mitigation_all: 0.28
-  mitigation_physical: 0.0
-  mitigation_magical: 0.0
-  shield_value: 0.0
-  heal_value: 0.0
-  probability: 0.333
-  timing_mean_offset_s: -3.57
-  timing_std_s: 1.0
-  sample_count: 3
-- event_id: e35_45977_411
-  skill_name: オブレーション
-  source_role: tank
-  target_channel: mt
-  stack_group: null
-  shield_stack_group: null
-  duration_s: 10.0
-  mitigation_all: 0.1
-  mitigation_physical: 0.0
-  mitigation_magical: 0.0
-  shield_value: 0.0
-  heal_value: 0.0
-  probability: 0.333
-  timing_mean_offset_s: -2.99
-  timing_std_s: 1.0
-  sample_count: 3
-- event_id: e36_45979_414
-  skill_name: ランパート
-  source_role: tank
-  target_channel: mt
-  stack_group: null
-  shield_stack_group: null
-  duration_s: 20.0
-  mitigation_all: 0.2
-  mitigation_physical: 0.0
-  mitigation_magical: 0.0
-  shield_value: 0.0
-  heal_value: 0.0
-  probability: 1.0
-  timing_mean_offset_s: -8.08
-  timing_std_s: 1.5
-  sample_count: 3
-- event_id: e36_45979_414
-  skill_name: ホーリーシェルトロン
-  source_role: tank
-  target_channel: mt
-  stack_group: null
-  shield_stack_group: null
-  duration_s: 8.0
-  mitigation_all: 0.28
+  mitigation_all: 0.25
   mitigation_physical: 0.0
   mitigation_magical: 0.0
   shield_value: 0.0
@@ -3617,13 +4849,61 @@ partner_profile:
   timing_std_s: 0.97
   sample_count: 3
 - event_id: e36_45979_414
-  skill_name: ハート・オブ・コランダム
+  skill_name: アサイズ (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 22000.0
+  probability: 0.333
+  timing_mean_offset_s: -0.4
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e36_45979_414
+  skill_name: アサイズ/ラプチャー等 (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 24000.0
+  probability: 0.333
+  timing_mean_offset_s: 7.66
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e36_45979_414
+  skill_name: ランパート
+  source_role: tank
+  target_channel: mt
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 20.0
+  mitigation_all: 0.2
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 0.0
+  probability: 0.333
+  timing_mean_offset_s: -7.36
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e36_45979_414
+  skill_name: タンク短バフ (25s)
   source_role: tank
   target_channel: mt
   stack_group: null
   shield_stack_group: null
   duration_s: 8.0
-  mitigation_all: 0.28
+  mitigation_all: 0.25
   mitigation_physical: 0.0
   mitigation_magical: 0.0
   shield_value: 0.0
@@ -3633,9 +4913,137 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e36_45979_414
-  skill_name: オブレーション
+  skill_name: タンク補助軽減
+  source_role: tank
+  target_channel: st
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 10.0
+  mitigation_all: 0.1
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 0.0
+  probability: 0.333
+  timing_mean_offset_s: -5.98
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e36_45979_414
+  skill_name: ピュアヒラ範囲HoT/設置
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 24.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 34000.0
+  probability: 0.333
+  timing_mean_offset_s: 4.08
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e37_45977_414
+  skill_name: ランパート
+  source_role: tank
+  target_channel: st
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 20.0
+  mitigation_all: 0.2
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 0.0
+  probability: 0.667
+  timing_mean_offset_s: -8.44
+  timing_std_s: 1.73
+  sample_count: 3
+- event_id: e37_45977_414
+  skill_name: タンク短バフ (25s)
+  source_role: tank
+  target_channel: st
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 8.0
+  mitigation_all: 0.25
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 0.0
+  probability: 0.667
+  timing_mean_offset_s: -7.01
+  timing_std_s: 0.97
+  sample_count: 3
+- event_id: e37_45977_414
+  skill_name: アサイズ (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 22000.0
+  probability: 0.333
+  timing_mean_offset_s: -0.4
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e37_45977_414
+  skill_name: アサイズ/ラプチャー等 (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 24000.0
+  probability: 0.333
+  timing_mean_offset_s: 7.66
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e37_45977_414
+  skill_name: ランパート
   source_role: tank
   target_channel: mt
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 20.0
+  mitigation_all: 0.2
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 0.0
+  probability: 0.333
+  timing_mean_offset_s: -7.36
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e37_45977_414
+  skill_name: タンク短バフ (25s)
+  source_role: tank
+  target_channel: mt
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 8.0
+  mitigation_all: 0.25
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 0.0
+  probability: 0.333
+  timing_mean_offset_s: -6.56
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e37_45977_414
+  skill_name: タンク補助軽減
+  source_role: tank
+  target_channel: st
   stack_group: null
   shield_stack_group: null
   duration_s: 10.0
@@ -3649,93 +5057,29 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e37_45977_414
-  skill_name: ランパート
-  source_role: tank
-  target_channel: mt
+  skill_name: ピュアヒラ範囲HoT/設置
+  source_role: healer
+  target_channel: party
   stack_group: null
   shield_stack_group: null
-  duration_s: 20.0
-  mitigation_all: 0.2
+  duration_s: 24.0
+  mitigation_all: 0.0
   mitigation_physical: 0.0
   mitigation_magical: 0.0
   shield_value: 0.0
-  heal_value: 0.0
-  probability: 1.0
-  timing_mean_offset_s: -8.08
-  timing_std_s: 1.5
-  sample_count: 3
-- event_id: e37_45977_414
-  skill_name: ホーリーシェルトロン
-  source_role: tank
-  target_channel: mt
-  stack_group: null
-  shield_stack_group: null
-  duration_s: 8.0
-  mitigation_all: 0.28
-  mitigation_physical: 0.0
-  mitigation_magical: 0.0
-  shield_value: 0.0
-  heal_value: 0.0
-  probability: 0.667
-  timing_mean_offset_s: -7.01
-  timing_std_s: 0.97
-  sample_count: 3
-- event_id: e37_45977_414
-  skill_name: ハート・オブ・コランダム
-  source_role: tank
-  target_channel: mt
-  stack_group: null
-  shield_stack_group: null
-  duration_s: 8.0
-  mitigation_all: 0.28
-  mitigation_physical: 0.0
-  mitigation_magical: 0.0
-  shield_value: 0.0
-  heal_value: 0.0
+  heal_value: 34000.0
   probability: 0.333
-  timing_mean_offset_s: -6.56
-  timing_std_s: 1.0
-  sample_count: 3
-- event_id: e37_45977_414
-  skill_name: オブレーション
-  source_role: tank
-  target_channel: mt
-  stack_group: null
-  shield_stack_group: null
-  duration_s: 10.0
-  mitigation_all: 0.1
-  mitigation_physical: 0.0
-  mitigation_magical: 0.0
-  shield_value: 0.0
-  heal_value: 0.0
-  probability: 0.333
-  timing_mean_offset_s: -5.98
+  timing_mean_offset_s: 4.08
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e38_45983_417
-  skill_name: ランパート
+  skill_name: タンク短バフ (25s)
   source_role: tank
-  target_channel: mt
-  stack_group: null
-  shield_stack_group: null
-  duration_s: 20.0
-  mitigation_all: 0.2
-  mitigation_physical: 0.0
-  mitigation_magical: 0.0
-  shield_value: 0.0
-  heal_value: 0.0
-  probability: 0.667
-  timing_mean_offset_s: -10.46
-  timing_std_s: 0.33
-  sample_count: 3
-- event_id: e38_45983_417
-  skill_name: ホーリーシェルトロン
-  source_role: tank
-  target_channel: mt
+  target_channel: st
   stack_group: null
   shield_stack_group: null
   duration_s: 8.0
-  mitigation_all: 0.28
+  mitigation_all: 0.25
   mitigation_physical: 0.0
   mitigation_magical: 0.0
   shield_value: 0.0
@@ -3745,9 +5089,41 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e38_45983_417
-  skill_name: オブレーション
+  skill_name: アサイズ/ラプチャー等 (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 24000.0
+  probability: 0.333
+  timing_mean_offset_s: 4.23
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e38_45983_417
+  skill_name: ランパート
   source_role: tank
   target_channel: mt
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 20.0
+  mitigation_all: 0.2
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 0.0
+  probability: 0.333
+  timing_mean_offset_s: -10.79
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e38_45983_417
+  skill_name: タンク補助軽減
+  source_role: tank
+  target_channel: st
   stack_group: null
   shield_stack_group: null
   duration_s: 10.0
@@ -3761,7 +5137,23 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e38_45983_417
-  skill_name: アサイラム
+  skill_name: ディヴァインベニゾン
+  source_role: healer
+  target_channel: mt
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 15.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 26000.0
+  heal_value: 0.0
+  probability: 0.333
+  timing_mean_offset_s: -1.75
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e38_45983_417
+  skill_name: ピュアヒラ範囲HoT/設置
   source_role: healer
   target_channel: party
   stack_group: null
@@ -3771,9 +5163,41 @@ partner_profile:
   mitigation_physical: 0.0
   mitigation_magical: 0.0
   shield_value: 0.0
-  heal_value: 32000.0
+  heal_value: 34000.0
   probability: 0.333
   timing_mean_offset_s: 0.65
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e38_45983_417
+  skill_name: アサイズ (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 22000.0
+  probability: 0.333
+  timing_mean_offset_s: 5.51
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e38_45983_417
+  skill_name: ランパート
+  source_role: tank
+  target_channel: st
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 20.0
+  mitigation_all: 0.2
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 0.0
+  probability: 0.333
+  timing_mean_offset_s: -10.14
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e39_45974_424
@@ -3792,8 +5216,88 @@ partner_profile:
   timing_mean_offset_s: -2.98
   timing_std_s: 1.0
   sample_count: 3
+- event_id: e39_45974_424
+  skill_name: アサイズ/ラプチャー等 (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 24000.0
+  probability: 0.333
+  timing_mean_offset_s: 1.78
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e39_45974_424
+  skill_name: ディヴァインベニゾン
+  source_role: healer
+  target_channel: mt
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 15.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 26000.0
+  heal_value: 0.0
+  probability: 0.333
+  timing_mean_offset_s: -9.14
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e39_45974_424
+  skill_name: アサイズ (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 22000.0
+  probability: 0.333
+  timing_mean_offset_s: -1.88
+  timing_std_s: 1.0
+  sample_count: 3
 - event_id: e3_45942_36
-  skill_name: ダークミッショナリー
+  skill_name: アサイズ/ラプチャー等 (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 24000.0
+  probability: 0.667
+  timing_mean_offset_s: 1.36
+  timing_std_s: 2.74
+  sample_count: 3
+- event_id: e3_45942_36
+  skill_name: ピュアヒラ大戻し (ベル/マクロ)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 20.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 55000.0
+  probability: 0.667
+  timing_mean_offset_s: 4.34
+  timing_std_s: 1.23
+  sample_count: 3
+- event_id: e3_45942_36
+  skill_name: タンク全体軽減 (90s)
   source_role: tank
   target_channel: party
   stack_group: null
@@ -3809,7 +5313,7 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e3_45942_36
-  skill_name: ダークマインド
+  skill_name: タンク補助軽減
   source_role: tank
   target_channel: mt
   stack_group: null
@@ -3825,7 +5329,7 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e3_45942_36
-  skill_name: テンパランス
+  skill_name: ピュアヒラ10%全体軽減
   source_role: healer
   target_channel: party
   stack_group: null
@@ -3838,6 +5342,22 @@ partner_profile:
   heal_value: 0.0
   probability: 0.333
   timing_mean_offset_s: -7.04
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e3_45942_36
+  skill_name: ディヴァインカレス (全体バリア+HoT)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 15.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 24000.0
+  heal_value: 16000.0
+  probability: 0.333
+  timing_mean_offset_s: -5.48
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e3_45942_36
@@ -3857,6 +5377,22 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e40_45977_427
+  skill_name: アサイズ/ラプチャー等 (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 24000.0
+  probability: 0.667
+  timing_mean_offset_s: 2.72
+  timing_std_s: 3.57
+  sample_count: 3
+- event_id: e40_45977_427
   skill_name: リプライザル
   source_role: tank
   target_channel: boss
@@ -3873,7 +5409,7 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e40_45977_427
-  skill_name: シャドウヴィジル
+  skill_name: タンク40%大バフ
   source_role: tank
   target_channel: mt
   stack_group: null
@@ -3886,6 +5422,22 @@ partner_profile:
   heal_value: 0.0
   probability: 0.333
   timing_mean_offset_s: -0.45
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e40_45977_427
+  skill_name: ディヴァインベニゾン
+  source_role: healer
+  target_channel: mt
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 15.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 26000.0
+  heal_value: 0.0
+  probability: 0.333
+  timing_mean_offset_s: -11.77
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e40_45977_427
@@ -3905,20 +5457,36 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e41_45977_430
-  skill_name: ブラックナイト
+  skill_name: タンク補助軽減
   source_role: tank
   target_channel: mt
   stack_group: null
   shield_stack_group: null
-  duration_s: 7.0
+  duration_s: 10.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.1
+  mitigation_magical: 0.2
+  shield_value: 0.0
+  heal_value: 0.0
+  probability: 0.667
+  timing_mean_offset_s: -1.7
+  timing_std_s: 0.46
+  sample_count: 3
+- event_id: e41_45977_430
+  skill_name: アサイズ/ラプチャー等 (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
   mitigation_all: 0.0
   mitigation_physical: 0.0
   mitigation_magical: 0.0
-  shield_value: 45000.0
-  heal_value: 0.0
+  shield_value: 0.0
+  heal_value: 24000.0
   probability: 0.667
-  timing_mean_offset_s: -0.86
-  timing_std_s: 0.62
+  timing_mean_offset_s: 3.46
+  timing_std_s: 0.15
   sample_count: 3
 - event_id: e41_45977_430
   skill_name: リプライザル
@@ -3937,7 +5505,7 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e41_45977_430
-  skill_name: シャドウヴィジル
+  skill_name: タンク40%大バフ
   source_role: tank
   target_channel: mt
   stack_group: null
@@ -3953,19 +5521,35 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e41_45977_430
-  skill_name: オブレーション
+  skill_name: タンク短バリア (TBN)
   source_role: tank
-  target_channel: mt
+  target_channel: st
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 7.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 55000.0
+  heal_value: 0.0
+  probability: 0.333
+  timing_mean_offset_s: -0.24
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e41_45977_430
+  skill_name: インドゥルゲンティア
+  source_role: healer
+  target_channel: party
   stack_group: null
   shield_stack_group: null
   duration_s: 10.0
-  mitigation_all: 0.1
+  mitigation_all: 0.0
   mitigation_physical: 0.0
   mitigation_magical: 0.0
   shield_value: 0.0
-  heal_value: 0.0
+  heal_value: 14000.0
   probability: 0.333
-  timing_mean_offset_s: -1.24
+  timing_mean_offset_s: 7.41
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e41_45977_430
@@ -3985,7 +5569,23 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e41_45977_430
-  skill_name: ダークマインド
+  skill_name: タンク短バリア (TBN)
+  source_role: tank
+  target_channel: mt
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 7.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 55000.0
+  heal_value: 0.0
+  probability: 0.333
+  timing_mean_offset_s: -1.49
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e42_45983_432
+  skill_name: タンク補助軽減
   source_role: tank
   target_channel: mt
   stack_group: null
@@ -3996,57 +5596,25 @@ partner_profile:
   mitigation_magical: 0.2
   shield_value: 0.0
   heal_value: 0.0
-  probability: 0.333
-  timing_mean_offset_s: -2.15
-  timing_std_s: 1.0
-  sample_count: 3
-- event_id: e42_45983_432
-  skill_name: シャドウヴィジル
-  source_role: tank
-  target_channel: mt
-  stack_group: null
-  shield_stack_group: null
-  duration_s: 15.0
-  mitigation_all: 0.4
-  mitigation_physical: 0.0
-  mitigation_magical: 0.0
-  shield_value: 0.0
-  heal_value: 0.0
   probability: 0.667
-  timing_mean_offset_s: -3.77
-  timing_std_s: 1.93
+  timing_mean_offset_s: -3.97
+  timing_std_s: 0.46
   sample_count: 3
 - event_id: e42_45983_432
-  skill_name: オブレーション
-  source_role: tank
-  target_channel: mt
+  skill_name: アサイズ/ラプチャー等 (範囲即時戻し)
+  source_role: healer
+  target_channel: party
   stack_group: null
   shield_stack_group: null
-  duration_s: 10.0
-  mitigation_all: 0.1
-  mitigation_physical: 0.0
-  mitigation_magical: 0.0
-  shield_value: 0.0
-  heal_value: 0.0
-  probability: 0.667
-  timing_mean_offset_s: -2.34
-  timing_std_s: 1.18
-  sample_count: 3
-- event_id: e42_45983_432
-  skill_name: ブラックナイト
-  source_role: tank
-  target_channel: mt
-  stack_group: null
-  shield_stack_group: null
-  duration_s: 7.0
+  duration_s: 0.0
   mitigation_all: 0.0
   mitigation_physical: 0.0
   mitigation_magical: 0.0
-  shield_value: 45000.0
-  heal_value: 0.0
+  shield_value: 0.0
+  heal_value: 24000.0
   probability: 0.667
-  timing_mean_offset_s: -3.13
-  timing_std_s: 0.62
+  timing_mean_offset_s: 1.19
+  timing_std_s: 0.15
   sample_count: 3
 - event_id: e42_45983_432
   skill_name: リプライザル
@@ -4065,7 +5633,55 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e42_45983_432
-  skill_name: テンパランス
+  skill_name: タンク40%大バフ
+  source_role: tank
+  target_channel: mt
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 15.0
+  mitigation_all: 0.4
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 0.0
+  probability: 0.333
+  timing_mean_offset_s: -5.7
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e42_45983_432
+  skill_name: タンク短バリア (TBN)
+  source_role: tank
+  target_channel: st
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 7.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 55000.0
+  heal_value: 0.0
+  probability: 0.333
+  timing_mean_offset_s: -2.51
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e42_45983_432
+  skill_name: タンク40%大バフ
+  source_role: tank
+  target_channel: st
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 15.0
+  mitigation_all: 0.4
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 0.0
+  probability: 0.333
+  timing_mean_offset_s: -1.84
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e42_45983_432
+  skill_name: ピュアヒラ10%全体軽減
   source_role: healer
   target_channel: party
   stack_group: null
@@ -4078,6 +5694,22 @@ partner_profile:
   heal_value: 0.0
   probability: 0.333
   timing_mean_offset_s: 0.16
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e42_45983_432
+  skill_name: インドゥルゲンティア
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 10.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 14000.0
+  probability: 0.333
+  timing_mean_offset_s: 5.14
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e42_45983_432
@@ -4097,7 +5729,39 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e42_45983_432
-  skill_name: ダークマインド
+  skill_name: タンク短バリア (TBN)
+  source_role: tank
+  target_channel: mt
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 7.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 55000.0
+  heal_value: 0.0
+  probability: 0.333
+  timing_mean_offset_s: -3.75
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e42_45983_432
+  skill_name: ピュアヒラ範囲HoT/設置
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 10.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 34000.0
+  probability: 0.333
+  timing_mean_offset_s: 7.3
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e43_45977_433
+  skill_name: タンク補助軽減
   source_role: tank
   target_channel: mt
   stack_group: null
@@ -4108,57 +5772,25 @@ partner_profile:
   mitigation_magical: 0.2
   shield_value: 0.0
   heal_value: 0.0
-  probability: 0.333
-  timing_mean_offset_s: -4.42
-  timing_std_s: 1.0
-  sample_count: 3
-- event_id: e43_45977_433
-  skill_name: シャドウヴィジル
-  source_role: tank
-  target_channel: mt
-  stack_group: null
-  shield_stack_group: null
-  duration_s: 15.0
-  mitigation_all: 0.4
-  mitigation_physical: 0.0
-  mitigation_magical: 0.0
-  shield_value: 0.0
-  heal_value: 0.0
   probability: 0.667
-  timing_mean_offset_s: -4.49
-  timing_std_s: 1.93
+  timing_mean_offset_s: -4.69
+  timing_std_s: 0.46
   sample_count: 3
 - event_id: e43_45977_433
-  skill_name: オブレーション
-  source_role: tank
-  target_channel: mt
+  skill_name: アサイズ/ラプチャー等 (範囲即時戻し)
+  source_role: healer
+  target_channel: party
   stack_group: null
   shield_stack_group: null
-  duration_s: 10.0
-  mitigation_all: 0.1
-  mitigation_physical: 0.0
-  mitigation_magical: 0.0
-  shield_value: 0.0
-  heal_value: 0.0
-  probability: 0.667
-  timing_mean_offset_s: -3.06
-  timing_std_s: 1.18
-  sample_count: 3
-- event_id: e43_45977_433
-  skill_name: ブラックナイト
-  source_role: tank
-  target_channel: mt
-  stack_group: null
-  shield_stack_group: null
-  duration_s: 7.0
+  duration_s: 0.0
   mitigation_all: 0.0
   mitigation_physical: 0.0
   mitigation_magical: 0.0
-  shield_value: 45000.0
-  heal_value: 0.0
+  shield_value: 0.0
+  heal_value: 24000.0
   probability: 0.667
-  timing_mean_offset_s: -3.85
-  timing_std_s: 0.62
+  timing_mean_offset_s: 0.47
+  timing_std_s: 0.15
   sample_count: 3
 - event_id: e43_45977_433
   skill_name: リプライザル
@@ -4177,7 +5809,55 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e43_45977_433
-  skill_name: テンパランス
+  skill_name: タンク40%大バフ
+  source_role: tank
+  target_channel: mt
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 15.0
+  mitigation_all: 0.4
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 0.0
+  probability: 0.333
+  timing_mean_offset_s: -6.42
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e43_45977_433
+  skill_name: タンク短バリア (TBN)
+  source_role: tank
+  target_channel: st
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 7.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 55000.0
+  heal_value: 0.0
+  probability: 0.333
+  timing_mean_offset_s: -3.23
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e43_45977_433
+  skill_name: タンク40%大バフ
+  source_role: tank
+  target_channel: st
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 15.0
+  mitigation_all: 0.4
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 0.0
+  probability: 0.333
+  timing_mean_offset_s: -2.56
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e43_45977_433
+  skill_name: ピュアヒラ10%全体軽減
   source_role: healer
   target_channel: party
   stack_group: null
@@ -4190,6 +5870,22 @@ partner_profile:
   heal_value: 0.0
   probability: 0.333
   timing_mean_offset_s: -0.56
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e43_45977_433
+  skill_name: インドゥルゲンティア
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 10.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 14000.0
+  probability: 0.333
+  timing_mean_offset_s: 4.42
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e43_45977_433
@@ -4209,7 +5905,39 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e43_45977_433
-  skill_name: ダークマインド
+  skill_name: タンク短バリア (TBN)
+  source_role: tank
+  target_channel: mt
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 7.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 55000.0
+  heal_value: 0.0
+  probability: 0.333
+  timing_mean_offset_s: -4.48
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e43_45977_433
+  skill_name: ピュアヒラ範囲HoT/設置
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 10.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 34000.0
+  probability: 0.333
+  timing_mean_offset_s: 6.58
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e44_45977_436
+  skill_name: タンク補助軽減
   source_role: tank
   target_channel: mt
   stack_group: null
@@ -4220,12 +5948,28 @@ partner_profile:
   mitigation_magical: 0.2
   shield_value: 0.0
   heal_value: 0.0
-  probability: 0.333
-  timing_mean_offset_s: -5.14
-  timing_std_s: 1.0
+  probability: 0.667
+  timing_mean_offset_s: -7.67
+  timing_std_s: 0.46
   sample_count: 3
 - event_id: e44_45977_436
-  skill_name: シャドウヴィジル
+  skill_name: アサイズ/ラプチャー等 (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 24000.0
+  probability: 0.667
+  timing_mean_offset_s: 6.2
+  timing_std_s: 1.33
+  sample_count: 3
+- event_id: e44_45977_436
+  skill_name: タンク40%大バフ
   source_role: tank
   target_channel: mt
   stack_group: null
@@ -4236,28 +5980,12 @@ partner_profile:
   mitigation_magical: 0.0
   shield_value: 0.0
   heal_value: 0.0
-  probability: 0.667
-  timing_mean_offset_s: -7.47
-  timing_std_s: 1.93
+  probability: 0.333
+  timing_mean_offset_s: -9.4
+  timing_std_s: 1.0
   sample_count: 3
 - event_id: e44_45977_436
-  skill_name: オブレーション
-  source_role: tank
-  target_channel: mt
-  stack_group: null
-  shield_stack_group: null
-  duration_s: 10.0
-  mitigation_all: 0.1
-  mitigation_physical: 0.0
-  mitigation_magical: 0.0
-  shield_value: 0.0
-  heal_value: 0.0
-  probability: 0.667
-  timing_mean_offset_s: -6.04
-  timing_std_s: 1.18
-  sample_count: 3
-- event_id: e44_45977_436
-  skill_name: ブラックナイト
+  skill_name: タンク短バリア (TBN)
   source_role: tank
   target_channel: mt
   stack_group: null
@@ -4266,14 +5994,46 @@ partner_profile:
   mitigation_all: 0.0
   mitigation_physical: 0.0
   mitigation_magical: 0.0
-  shield_value: 45000.0
+  shield_value: 55000.0
   heal_value: 0.0
-  probability: 0.667
-  timing_mean_offset_s: -3.02
-  timing_std_s: 3.2
+  probability: 0.333
+  timing_mean_offset_s: 0.18
+  timing_std_s: 1.0
   sample_count: 3
 - event_id: e44_45977_436
-  skill_name: テンパランス
+  skill_name: タンク短バリア (TBN)
+  source_role: tank
+  target_channel: st
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 7.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 55000.0
+  heal_value: 0.0
+  probability: 0.333
+  timing_mean_offset_s: -6.21
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e44_45977_436
+  skill_name: タンク40%大バフ
+  source_role: tank
+  target_channel: st
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 15.0
+  mitigation_all: 0.4
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 0.0
+  probability: 0.333
+  timing_mean_offset_s: -5.55
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e44_45977_436
+  skill_name: ピュアヒラ10%全体軽減
   source_role: healer
   target_channel: party
   stack_group: null
@@ -4286,6 +6046,22 @@ partner_profile:
   heal_value: 0.0
   probability: 0.333
   timing_mean_offset_s: -3.54
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e44_45977_436
+  skill_name: インドゥルゲンティア
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 10.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 14000.0
+  probability: 0.333
+  timing_mean_offset_s: 1.44
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e44_45977_436
@@ -4305,23 +6081,55 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e44_45977_436
-  skill_name: ダークマインド
-  source_role: tank
-  target_channel: mt
+  skill_name: ピュアヒラ範囲HoT/設置
+  source_role: healer
+  target_channel: party
   stack_group: null
   shield_stack_group: null
   duration_s: 10.0
   mitigation_all: 0.0
-  mitigation_physical: 0.1
-  mitigation_magical: 0.2
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
   shield_value: 0.0
-  heal_value: 0.0
+  heal_value: 34000.0
   probability: 0.333
-  timing_mean_offset_s: -8.12
+  timing_mean_offset_s: 3.6
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e45_45982_439
-  skill_name: ブラックナイト
+  skill_name: アサイズ/ラプチャー等 (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 24000.0
+  probability: 0.667
+  timing_mean_offset_s: 2.77
+  timing_std_s: 1.33
+  sample_count: 3
+- event_id: e45_45982_439
+  skill_name: ピュアヒラ10%全体軽減
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 15.0
+  mitigation_all: 0.1
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 22000.0
+  probability: 0.667
+  timing_mean_offset_s: -4.87
+  timing_std_s: 2.1
+  sample_count: 3
+- event_id: e45_45982_439
+  skill_name: タンク短バリア (TBN)
   source_role: tank
   target_channel: mt
   stack_group: null
@@ -4330,16 +6138,16 @@ partner_profile:
   mitigation_all: 0.0
   mitigation_physical: 0.0
   mitigation_magical: 0.0
-  shield_value: 45000.0
+  shield_value: 55000.0
   heal_value: 0.0
   probability: 0.333
   timing_mean_offset_s: -3.25
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e45_45982_439
-  skill_name: シャドウヴィジル
+  skill_name: タンク40%大バフ
   source_role: tank
-  target_channel: mt
+  target_channel: st
   stack_group: null
   shield_stack_group: null
   duration_s: 15.0
@@ -4353,23 +6161,23 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e45_45982_439
-  skill_name: テンパランス
+  skill_name: インドゥルゲンティア
   source_role: healer
   target_channel: party
   stack_group: null
   shield_stack_group: null
-  duration_s: 20.0
-  mitigation_all: 0.1
+  duration_s: 10.0
+  mitigation_all: 0.0
   mitigation_physical: 0.0
   mitigation_magical: 0.0
   shield_value: 0.0
-  heal_value: 0.0
+  heal_value: 14000.0
   probability: 0.333
-  timing_mean_offset_s: -6.97
+  timing_mean_offset_s: -1.99
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e45_45982_439
-  skill_name: オブレーション
+  skill_name: タンク補助軽減
   source_role: tank
   target_channel: mt
   stack_group: null
@@ -4385,23 +6193,7 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e45_45982_439
-  skill_name: 運命の輪
-  source_role: healer
-  target_channel: party
-  stack_group: null
-  shield_stack_group: null
-  duration_s: 15.0
-  mitigation_all: 0.1
-  mitigation_physical: 0.0
-  mitigation_magical: 0.0
-  shield_value: 0.0
-  heal_value: 22000.0
-  probability: 0.333
-  timing_mean_offset_s: -2.77
-  timing_std_s: 1.0
-  sample_count: 3
-- event_id: e45_45982_439
-  skill_name: アーサリースター
+  skill_name: ピュアヒラ範囲HoT/設置
   source_role: healer
   target_channel: party
   stack_group: null
@@ -4411,13 +6203,45 @@ partner_profile:
   mitigation_physical: 0.0
   mitigation_magical: 0.0
   shield_value: 0.0
-  heal_value: 32000.0
+  heal_value: 34000.0
   probability: 0.333
   timing_mean_offset_s: 0.17
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e46_47235_439
-  skill_name: ブラックナイト
+  skill_name: アサイズ/ラプチャー等 (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 24000.0
+  probability: 0.667
+  timing_mean_offset_s: 2.77
+  timing_std_s: 1.33
+  sample_count: 3
+- event_id: e46_47235_439
+  skill_name: ピュアヒラ10%全体軽減
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 15.0
+  mitigation_all: 0.1
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 22000.0
+  probability: 0.667
+  timing_mean_offset_s: -4.87
+  timing_std_s: 2.1
+  sample_count: 3
+- event_id: e46_47235_439
+  skill_name: タンク短バリア (TBN)
   source_role: tank
   target_channel: mt
   stack_group: null
@@ -4426,16 +6250,16 @@ partner_profile:
   mitigation_all: 0.0
   mitigation_physical: 0.0
   mitigation_magical: 0.0
-  shield_value: 45000.0
+  shield_value: 55000.0
   heal_value: 0.0
   probability: 0.333
   timing_mean_offset_s: -3.25
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e46_47235_439
-  skill_name: シャドウヴィジル
+  skill_name: タンク40%大バフ
   source_role: tank
-  target_channel: mt
+  target_channel: st
   stack_group: null
   shield_stack_group: null
   duration_s: 15.0
@@ -4449,23 +6273,23 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e46_47235_439
-  skill_name: テンパランス
+  skill_name: インドゥルゲンティア
   source_role: healer
   target_channel: party
   stack_group: null
   shield_stack_group: null
-  duration_s: 20.0
-  mitigation_all: 0.1
+  duration_s: 10.0
+  mitigation_all: 0.0
   mitigation_physical: 0.0
   mitigation_magical: 0.0
   shield_value: 0.0
-  heal_value: 0.0
+  heal_value: 14000.0
   probability: 0.333
-  timing_mean_offset_s: -6.97
+  timing_mean_offset_s: -1.99
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e46_47235_439
-  skill_name: オブレーション
+  skill_name: タンク補助軽減
   source_role: tank
   target_channel: mt
   stack_group: null
@@ -4481,23 +6305,7 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e46_47235_439
-  skill_name: 運命の輪
-  source_role: healer
-  target_channel: party
-  stack_group: null
-  shield_stack_group: null
-  duration_s: 15.0
-  mitigation_all: 0.1
-  mitigation_physical: 0.0
-  mitigation_magical: 0.0
-  shield_value: 0.0
-  heal_value: 22000.0
-  probability: 0.333
-  timing_mean_offset_s: -2.77
-  timing_std_s: 1.0
-  sample_count: 3
-- event_id: e46_47235_439
-  skill_name: アーサリースター
+  skill_name: ピュアヒラ範囲HoT/設置
   source_role: healer
   target_channel: party
   stack_group: null
@@ -4507,7 +6315,7 @@ partner_profile:
   mitigation_physical: 0.0
   mitigation_magical: 0.0
   shield_value: 0.0
-  heal_value: 32000.0
+  heal_value: 34000.0
   probability: 0.333
   timing_mean_offset_s: 0.17
   timing_std_s: 1.0
@@ -4529,7 +6337,23 @@ partner_profile:
   timing_std_s: 0.62
   sample_count: 3
 - event_id: e47_45985_455
-  skill_name: ハート・オブ・ライト
+  skill_name: アサイズ (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 22000.0
+  probability: 0.333
+  timing_mean_offset_s: -0.49
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e47_45985_455
+  skill_name: タンク全体軽減 (90s)
   source_role: tank
   target_channel: party
   stack_group: null
@@ -4545,7 +6369,7 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e47_45985_455
-  skill_name: サンサイン
+  skill_name: ピュアヒラ10%全体軽減2
   source_role: healer
   target_channel: party
   stack_group: null
@@ -4577,6 +6401,22 @@ partner_profile:
   timing_std_s: 1.06
   sample_count: 2
 - event_id: e48_45955_500
+  skill_name: ピュアヒラ10%全体軽減
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 15.0
+  mitigation_all: 0.1
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 22000.0
+  probability: 1.0
+  timing_mean_offset_s: -1.15
+  timing_std_s: 0.86
+  sample_count: 2
+- event_id: e48_45955_500
   skill_name: リプライザル
   source_role: tank
   target_channel: boss
@@ -4593,23 +6433,23 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 2
 - event_id: e48_45955_500
-  skill_name: テンパランス
+  skill_name: アサイズ (範囲即時戻し)
   source_role: healer
   target_channel: party
   stack_group: null
   shield_stack_group: null
-  duration_s: 20.0
-  mitigation_all: 0.1
+  duration_s: 0.0
+  mitigation_all: 0.0
   mitigation_physical: 0.0
   mitigation_magical: 0.0
   shield_value: 0.0
-  heal_value: 0.0
+  heal_value: 22000.0
   probability: 0.5
-  timing_mean_offset_s: -2.01
+  timing_mean_offset_s: 0.35
   timing_std_s: 1.0
   sample_count: 2
 - event_id: e48_45955_500
-  skill_name: ダークミッショナリー
+  skill_name: タンク全体軽減 (90s)
   source_role: tank
   target_channel: party
   stack_group: null
@@ -4641,23 +6481,7 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 2
 - event_id: e48_45955_500
-  skill_name: 運命の輪
-  source_role: healer
-  target_channel: party
-  stack_group: null
-  shield_stack_group: null
-  duration_s: 15.0
-  mitigation_all: 0.1
-  mitigation_physical: 0.0
-  mitigation_magical: 0.0
-  shield_value: 0.0
-  heal_value: 22000.0
-  probability: 0.5
-  timing_mean_offset_s: -0.3
-  timing_std_s: 1.0
-  sample_count: 2
-- event_id: e48_45955_500
-  skill_name: アーサリースター
+  skill_name: ピュアヒラ範囲HoT/設置
   source_role: healer
   target_channel: party
   stack_group: null
@@ -4667,13 +6491,13 @@ partner_profile:
   mitigation_physical: 0.0
   mitigation_magical: 0.0
   shield_value: 0.0
-  heal_value: 32000.0
+  heal_value: 34000.0
   probability: 0.5
   timing_mean_offset_s: 0.72
   timing_std_s: 1.0
   sample_count: 2
 - event_id: e4_45942_40
-  skill_name: リタージー・オブ・ベル
+  skill_name: ピュアヒラ大戻し (ベル/マクロ)
   source_role: healer
   target_channel: party
   stack_group: null
@@ -4683,13 +6507,13 @@ partner_profile:
   mitigation_physical: 0.0
   mitigation_magical: 0.0
   shield_value: 0.0
-  heal_value: 45000.0
+  heal_value: 55000.0
   probability: 0.667
   timing_mean_offset_s: -0.07
   timing_std_s: 1.23
   sample_count: 3
 - event_id: e4_45942_40
-  skill_name: ダークミッショナリー
+  skill_name: タンク全体軽減 (90s)
   source_role: tank
   target_channel: party
   stack_group: null
@@ -4705,7 +6529,39 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e4_45942_40
-  skill_name: テンパランス
+  skill_name: アサイズ/ラプチャー等 (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 24000.0
+  probability: 0.333
+  timing_mean_offset_s: -0.31
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e4_45942_40
+  skill_name: アサイズ (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 22000.0
+  probability: 0.333
+  timing_mean_offset_s: 3.74
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e4_45942_40
+  skill_name: ピュアヒラ10%全体軽減
   source_role: healer
   target_channel: party
   stack_group: null
@@ -4718,6 +6574,38 @@ partner_profile:
   heal_value: 0.0
   probability: 0.333
   timing_mean_offset_s: -11.45
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e4_45942_40
+  skill_name: ディヴァインカレス (全体バリア+HoT)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 15.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 24000.0
+  heal_value: 16000.0
+  probability: 0.333
+  timing_mean_offset_s: -9.89
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e4_45942_40
+  skill_name: インドゥルゲンティア
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 10.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 14000.0
+  probability: 0.333
+  timing_mean_offset_s: 3.68
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e4_45942_40
@@ -4753,7 +6641,23 @@ partner_profile:
   timing_std_s: 0.16
   sample_count: 3
 - event_id: e5_45955_48
-  skill_name: ダークミッショナリー
+  skill_name: アサイズ/ラプチャー等 (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 24000.0
+  probability: 0.667
+  timing_mean_offset_s: 4.58
+  timing_std_s: 2.27
+  sample_count: 3
+- event_id: e5_45955_48
+  skill_name: タンク全体軽減 (90s)
   source_role: tank
   target_channel: party
   stack_group: null
@@ -4800,6 +6704,86 @@ partner_profile:
   timing_mean_offset_s: -1.31
   timing_std_s: 1.0
   sample_count: 3
+- event_id: e5_45955_48
+  skill_name: アサイズ (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 22000.0
+  probability: 0.333
+  timing_mean_offset_s: 3.55
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e6_45926_61
+  skill_name: アサイズ/ラプチャー等 (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 24000.0
+  probability: 0.333
+  timing_mean_offset_s: 2.27
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e6_45926_61
+  skill_name: テトラグラマトン
+  source_role: healer
+  target_channel: mt
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 36000.0
+  probability: 0.333
+  timing_mean_offset_s: 6.77
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e7_45930_114
+  skill_name: ピュアヒラ範囲HoT/設置
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 10.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 34000.0
+  probability: 0.667
+  timing_mean_offset_s: 4.2
+  timing_std_s: 0.19
+  sample_count: 3
+- event_id: e7_45930_114
+  skill_name: アサイズ/ラプチャー等 (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 24000.0
+  probability: 0.667
+  timing_mean_offset_s: 4.72
+  timing_std_s: 2.89
+  sample_count: 3
 - event_id: e8_45926_139
   skill_name: リプライザル
   source_role: tank
@@ -4833,7 +6817,7 @@ partner_profile:
   timing_std_s: 3.34
   sample_count: 3
 - event_id: e8_45926_139
-  skill_name: ディヴァインヴェール
+  skill_name: タンク全体バリア (90s)
   source_role: tank
   target_channel: party
   stack_group: null
@@ -4849,7 +6833,7 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e8_45926_139
-  skill_name: テンパランス
+  skill_name: ピュアヒラ10%全体軽減
   source_role: healer
   target_channel: party
   stack_group: null
@@ -4865,7 +6849,7 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e8_45926_139
-  skill_name: ハート・オブ・ライト
+  skill_name: タンク全体軽減 (90s)
   source_role: tank
   target_channel: party
   stack_group: null
@@ -4897,7 +6881,7 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e8_45926_139
-  skill_name: アサイラム
+  skill_name: ピュアヒラ範囲HoT/設置
   source_role: healer
   target_channel: party
   stack_group: null
@@ -4907,7 +6891,7 @@ partner_profile:
   mitigation_physical: 0.0
   mitigation_magical: 0.0
   shield_value: 0.0
-  heal_value: 32000.0
+  heal_value: 34000.0
   probability: 0.333
   timing_mean_offset_s: -0.63
   timing_std_s: 1.0
@@ -4929,7 +6913,7 @@ partner_profile:
   timing_std_s: 0.9
   sample_count: 3
 - event_id: e9_45933_153
-  skill_name: ダークミッショナリー
+  skill_name: タンク全体軽減 (90s)
   source_role: tank
   target_channel: party
   stack_group: null
@@ -4961,7 +6945,7 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e9_45933_153
-  skill_name: ダークマインド
+  skill_name: タンク補助軽減
   source_role: tank
   target_channel: mt
   stack_group: null
@@ -4974,6 +6958,22 @@ partner_profile:
   heal_value: 0.0
   probability: 0.333
   timing_mean_offset_s: 0.13
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e9_45933_153
+  skill_name: ディヴァインベニゾン
+  source_role: healer
+  target_channel: mt
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 15.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 26000.0
+  heal_value: 0.0
+  probability: 0.333
+  timing_mean_offset_s: -10.79
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e9_45933_153
@@ -4993,7 +6993,23 @@ partner_profile:
   timing_std_s: 1.0
   sample_count: 3
 - event_id: e9_45933_153
-  skill_name: ディヴァインヴェール
+  skill_name: アサイズ/ラプチャー等 (範囲即時戻し)
+  source_role: healer
+  target_channel: party
+  stack_group: null
+  shield_stack_group: null
+  duration_s: 0.0
+  mitigation_all: 0.0
+  mitigation_physical: 0.0
+  mitigation_magical: 0.0
+  shield_value: 0.0
+  heal_value: 24000.0
+  probability: 0.333
+  timing_mean_offset_s: 1.95
+  timing_std_s: 1.0
+  sample_count: 3
+- event_id: e9_45933_153
+  skill_name: タンク全体バリア (90s)
   source_role: tank
   target_channel: party
   stack_group: null

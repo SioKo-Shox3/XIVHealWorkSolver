@@ -377,7 +377,7 @@ def extract_partner_probabilities(
     exclude_actor_names: set[str] | None = None,
     include_only_actor_names: set[str] | None = None,
     pre_window_s: float = 12.0,
-    post_heal_window_s: float = 3.0,
+    post_heal_window_s: float = 8.0,
 ) -> list[PartnerActionProb]:
     """Learn empirical mitigation/heal probabilities per event using phase-reached pull denominators.
 
@@ -388,8 +388,8 @@ def extract_partner_probabilities(
     exclude_set = {n.lower() for n in (exclude_actor_names or set())}
     include_set = {n.lower() for n in (include_only_actor_names or set())} if include_only_actor_names else None
 
-    observations: dict[tuple[str, int, str], list[float]] = defaultdict(list)
-    meta_by_key: dict[tuple[str, int, str], dict[str, Any]] = {}
+    observations: dict[tuple[str, str, str], list[float]] = defaultdict(list)
+    meta_by_key: dict[tuple[str, str, str], dict[str, Any]] = {}
     reached_counts: dict[str, int] = defaultdict(int)
 
     for fight_bundle in fights_cast_streams:
@@ -409,7 +409,7 @@ def extract_partner_probabilities(
             if fight_dur_s >= dmg_ev.time_s - 0.5:
                 reached_counts[dmg_ev.id] += 1
 
-        seen_in_fight: set[tuple[str, int, str]] = set()
+        seen_in_fight: set[tuple[str, str, str]] = set()
         for ev in casts:
             if ev.get("type") != "cast":
                 continue
@@ -429,6 +429,9 @@ def extract_partner_probabilities(
             t_channel = str(eff.get("target_channel", "party"))
             if t_channel in ("mt", "st") and src_id in tank_slot_map:
                 t_channel = tank_slot_map[src_id]
+
+            # Aggregate across job-equivalent skills using `role_slot` when provided (e.g., PLD/WAR/DRK/GNB 40% CD)
+            slot_key = str(eff.get("role_slot") or ab_id)
 
             cast_s = (float(ev["timestamp"]) - fight_start_ms) / 1000.0
             is_mit_or_shield = (
@@ -450,7 +453,7 @@ def extract_partner_probabilities(
                 else:
                     matched = -2.0 <= offset <= post_heal_window_s
                 if matched:
-                    key = (dmg_ev.id, ab_id, t_channel)
+                    key = (dmg_ev.id, slot_key, t_channel)
                     if key not in seen_in_fight:
                         seen_in_fight.add(key)
                         observations[key].append(offset)
@@ -460,13 +463,13 @@ def extract_partner_probabilities(
                         }
 
     results: list[PartnerActionProb] = []
-    for (event_id, _ab_id, t_channel), offsets in observations.items():
+    for (event_id, _slot_key, t_channel), offsets in observations.items():
         denom = max(1, reached_counts.get(event_id, len(fights_cast_streams)))
         prob = len(offsets) / denom
         if prob < 0.15:
             continue
-        eff = meta_by_key[(event_id, _ab_id, t_channel)]["effect"]
-        role = meta_by_key[(event_id, _ab_id, t_channel)]["role"]
+        eff = meta_by_key[(event_id, _slot_key, t_channel)]["effect"]
+        role = meta_by_key[(event_id, _slot_key, t_channel)]["role"]
         results.append(
             PartnerActionProb(
                 event_id=event_id,
