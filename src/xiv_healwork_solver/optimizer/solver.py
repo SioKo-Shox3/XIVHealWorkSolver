@@ -130,6 +130,7 @@ def _partner_event_summary(
     partner_actions: list[PartnerActionProb],
     damage_type: str,
     partner_trust: float,
+    channel: str | None = None,
 ) -> tuple[float, float, float, set[str]]:
     log_mit = 0.0
     shields = 0.0
@@ -138,6 +139,8 @@ def _partner_event_summary(
     used_groups_mit: dict[str, float] = {}
 
     for pa in partner_actions:
+        if channel is not None and pa.target_channel not in ("party", "boss") and pa.target_channel != channel:
+            continue
         eff_prob = pa.probability * partner_trust
         if eff_prob <= 0.0:
             continue
@@ -514,16 +517,20 @@ def solve_mitigation_plan(
         dot_ticks_before_next = min(dot_ticks_total, int(max(0.0, dt_to_next) // ev.dot_tick_interval_s))
         dot_frac_before_next = (dot_ticks_before_next / dot_ticks_total) if dot_dmg > 0 else 0.0
 
-        p_log_mit, p_shields, p_heals, p_groups = _partner_event_summary(
-            partner_by_event.get(ev.id, []), ev.damage_type, partner_trust
-        )
-        p_log_i = int(round(p_log_mit * LOG_SCALE))
+        p_groups_all: set[str] = set()
 
         for ch in channels:
             max_hp = max_hp_by_ch[ch]
+            ch_raw_dmg = int(round(raw_dmg * kit.tank_raidwide_damage_ratio)) if (ev.target_scope == "party" and ch in ("mt", "st")) else raw_dmg
             ch_scope = "mt" if ch == "mt" else ("st" if ch == "st" else "party")
             passive_mit = kit.passive_self_mitigation_for(ch_scope)  # type: ignore[arg-type]
             passive_log_i = int(round(_neg_ln_one_minus(passive_mit) * LOG_SCALE)) if passive_mit > 0 else 0
+
+            p_log_mit, p_shields, p_heals, p_groups_ch = _partner_event_summary(
+                partner_by_event.get(ev.id, []), ev.damage_type, partner_trust, channel=ch
+            )
+            p_groups_all |= p_groups_ch
+            p_log_i = int(round(p_log_mit * LOG_SCALE))
 
             self_log_terms = []
             for s, sk in enumerate(skills):
@@ -550,8 +557,8 @@ def solve_mitigation_plan(
                 pct_i = int(round(max_hp * ev.hp_percent_fraction))
                 eff_dmg = model.NewIntVar(pct_i, pct_i, f"eff_dmg_{e}_{ch}")
             else:
-                eff_dmg = model.NewIntVar(0, raw_dmg, f"eff_dmg_{e}_{ch}")
-                model.Add(RATIO_SCALE * eff_dmg >= raw_dmg * rem_ratio)
+                eff_dmg = model.NewIntVar(0, ch_raw_dmg, f"eff_dmg_{e}_{ch}")
+                model.Add(RATIO_SCALE * eff_dmg >= ch_raw_dmg * rem_ratio)
 
             # Only charge DoT ticks that actually land before next event!
             dot_part_raw = int(round(dot_dmg * dot_frac_before_next))
@@ -672,7 +679,7 @@ def solve_mitigation_plan(
                 objective_terms.append(dps_pen * x[e][s])
             if ev.requires_movement and sk.cast_time_s > 0.0:
                 objective_terms.append(weights.movement_cast_weight * x[e][s])
-            if sk.stack_group and sk.stack_group in p_groups:
+            if sk.stack_group and sk.stack_group in p_groups_all:
                 objective_terms.append(weights.overlap_weight * active[e][s])
 
     model.Minimize(sum(objective_terms))

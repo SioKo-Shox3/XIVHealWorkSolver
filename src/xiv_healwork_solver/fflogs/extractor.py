@@ -252,7 +252,16 @@ def extract_damage_timeline(
         else:
             scope = "party"
 
-        avg_raw = mean(x["raw_damage"] for x in cl)
+        # Use true non-zero unmitigated hits from non-tank targets for party raidwides (avoids 100%-shielded zeros & tank armor bias)
+        if scope == "party":
+            non_tank_unmit = [
+                x["raw_damage"]
+                for x in cl
+                if (x["target_id"] is None or int(x["target_id"]) not in tank_slot_by_id) and x["raw_damage"] > 0
+            ]
+            avg_raw = mean(non_tank_unmit) if non_tank_unmit else mean(x["raw_damage"] for x in cl)
+        else:
+            avg_raw = mean(x["raw_damage"] for x in cl)
         hit_count = max(1, round(len(cl) / max(1, len(unique_targets))))
         first_t = cl[0]["time_s"]
         last_t = cl[-1]["time_s"]
@@ -379,8 +388,8 @@ def extract_partner_probabilities(
     exclude_set = {n.lower() for n in (exclude_actor_names or set())}
     include_set = {n.lower() for n in (include_only_actor_names or set())} if include_only_actor_names else None
 
-    observations: dict[tuple[str, int], list[float]] = defaultdict(list)
-    meta_by_key: dict[tuple[str, int], dict[str, Any]] = {}
+    observations: dict[tuple[str, int, str], list[float]] = defaultdict(list)
+    meta_by_key: dict[tuple[str, int, str], dict[str, Any]] = {}
     reached_counts: dict[str, int] = defaultdict(int)
 
     for fight_bundle in fights_cast_streams:
@@ -390,11 +399,17 @@ def extract_partner_probabilities(
         casts = fight_bundle["casts"]
         actors_by_id: dict[int, dict[str, Any]] = fight_bundle["actors_by_id"]
 
+        # Identify MT/ST actor IDs in this fight so personal tank mits route to the actual caster's tank slot!
+        tank_actors = [int(aid) for aid, a in sorted(actors_by_id.items()) if _actor_role_from_subtype(a.get("subType")) == "tank"]
+        tank_slot_map = fight_bundle.get("tank_slot_by_id") or (
+            {tank_actors[0]: "mt", **({tank_actors[1]: "st"} if len(tank_actors) > 1 else {})} if tank_actors else {}
+        )
+
         for dmg_ev in timeline.events:
             if fight_dur_s >= dmg_ev.time_s - 0.5:
                 reached_counts[dmg_ev.id] += 1
 
-        seen_in_fight: set[tuple[str, int]] = set()
+        seen_in_fight: set[tuple[str, int, str]] = set()
         for ev in casts:
             if ev.get("type") != "cast":
                 continue
@@ -402,12 +417,18 @@ def extract_partner_probabilities(
             if ab_id not in known_skill_effects:
                 continue
             eff = known_skill_effects[ab_id]
-            src = actors_by_id.get(int(ev.get("sourceID", -1)), {})
+            src_id = int(ev.get("sourceID", -1))
+            src = actors_by_id.get(src_id, {})
             src_name = str(src.get("name", ""))
             if src_name.lower() in exclude_set:
                 continue
             if include_set is not None and src_name.lower() not in include_set:
                 continue
+
+            # Route tank personal mitigations to whichever tank (mt or st) actually cast it
+            t_channel = str(eff.get("target_channel", "party"))
+            if t_channel in ("mt", "st") and src_id in tank_slot_map:
+                t_channel = tank_slot_map[src_id]
 
             cast_s = (float(ev["timestamp"]) - fight_start_ms) / 1000.0
             is_mit_or_shield = (
@@ -429,7 +450,7 @@ def extract_partner_probabilities(
                 else:
                     matched = -2.0 <= offset <= post_heal_window_s
                 if matched:
-                    key = (dmg_ev.id, ab_id)
+                    key = (dmg_ev.id, ab_id, t_channel)
                     if key not in seen_in_fight:
                         seen_in_fight.add(key)
                         observations[key].append(offset)
@@ -439,19 +460,19 @@ def extract_partner_probabilities(
                         }
 
     results: list[PartnerActionProb] = []
-    for (event_id, _ab_id), offsets in observations.items():
+    for (event_id, _ab_id, t_channel), offsets in observations.items():
         denom = max(1, reached_counts.get(event_id, len(fights_cast_streams)))
         prob = len(offsets) / denom
         if prob < 0.15:
             continue
-        eff = meta_by_key[(event_id, _ab_id)]["effect"]
-        role = meta_by_key[(event_id, _ab_id)]["role"]
+        eff = meta_by_key[(event_id, _ab_id, t_channel)]["effect"]
+        role = meta_by_key[(event_id, _ab_id, t_channel)]["role"]
         results.append(
             PartnerActionProb(
                 event_id=event_id,
                 skill_name=eff["name"],
                 source_role=role,
-                target_channel=eff.get("target_channel", "party"),
+                target_channel=t_channel,  # type: ignore[arg-type]
                 stack_group=eff.get("stack_group"),
                 shield_stack_group=eff.get("shield_stack_group"),
                 duration_s=float(eff.get("duration_s", 15.0)),

@@ -13,6 +13,7 @@ from rich.table import Table
 from xiv_healwork_solver.colab.robustness_sim import run_robustness_simulation
 from xiv_healwork_solver.exporter.sheets import export_csv, export_json, export_markdown
 from xiv_healwork_solver.fflogs.client import FFLogsClient
+from xiv_healwork_solver.fflogs.dataset import build_curated_encounter_timeline
 from xiv_healwork_solver.fflogs.extractor import extract_damage_timeline
 from xiv_healwork_solver.models import EncounterTimeline, LiveFightState, ObjectivePreset, PlayerKit
 from xiv_healwork_solver.optimizer.solver import replan_from_state, solve_mitigation_plan
@@ -198,6 +199,42 @@ def replan(
     )
     plan = replan_from_state(kit, timeline, state, preset=preset)
     _print_plan_table(plan)
+
+
+@app.command("build-encounter")
+def build_encounter(
+    encounter_id: int = typer.Argument(..., help="FFLogs encounter ID (e.g. 101 = M9S Vamp Fatale)"),
+    spec: str = typer.Option("Scholar", "--spec", "-s", help="Your job spec name on FFLogs"),
+    page: int = typer.Option(5, "--page", help="Ranking page (higher pages avoid #1 speedkill outliers)"),
+    candidates: int = typer.Option(10, "--candidates", help="How many candidate reports to audit"),
+    partner_fights: int = typer.Option(4, "--partner-fights", help="Curated clears to aggregate partner profile from"),
+    out: Path = typer.Option(Path("data/timelines/encounter.yaml"), "--out", "-o", help="Output timeline YAML"),
+) -> None:
+    """Fetch, curate (filtering Chad-healing & outliers), and extract an encounter timeline + partner profile."""
+    root = Path(__file__).resolve().parents[2]
+    timeline, accepted, rejected = build_curated_encounter_timeline(
+        encounter_id=encounter_id,
+        target_spec=spec,
+        known_skills_path=root / "data" / "known_party_skills.yaml",
+        ranking_page=page,
+        inspect_candidates=candidates,
+        partner_sample_fights=partner_fights,
+    )
+    console.print(f"[bold]Curation Summary:[/bold] accepted={len(accepted)}, rejected={len(rejected)}")
+    for r in accepted[:5]:
+        console.print(
+            f"  [green]OK[/green] {r.report_code}#{r.fight_id} dur={r.duration_s}s "
+            f"combRDPS={r.combined_healer_rdps:.0f} shares={r.healer_effective_shares} score={r.quality_score}"
+        )
+    for r in rejected[:5]:
+        console.print(f"  [yellow]REJ[/yellow] {r.report_code}#{r.fight_id} reasons={r.reasons}")
+
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(yaml.safe_dump(timeline.model_dump(), allow_unicode=True, sort_keys=False), encoding="utf-8")
+    console.print(
+        f"[green]Saved '{timeline.encounter_name}' ({len(timeline.events)} events, "
+        f"{len(timeline.auto_attacks)} AA segments, {len(timeline.partner_profile)} partner probs) -> {out}[/green]"
+    )
 
 
 @app.command("check-fflogs")

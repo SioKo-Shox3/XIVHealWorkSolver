@@ -167,10 +167,10 @@ class CombatEngine:
         self.heal_scale = kit.gear_stats.heal_scale_multiplier
         self.tenacity_mit = kit.gear_stats.tenacity_passive_mitigation(kit.role)
 
-        # Natural 3s MP tick (Piety + optional averaged Lucid if Lucid is not an explicit skill)
-        self.base_mp_per_3s_tick = kit.gear_stats.combat_mp_per_3s_tick()
-        if not self.has_explicit_lucid:
-            self.base_mp_per_3s_tick += kit.gear_stats.lucid_dreaming_mp_per_sec * 3.0
+        # Natural 3s MP tick (Piety + passive MP regen such as Aetherflow/Assize; explicit Lucid buffs add on top)
+        self.base_mp_per_3s_tick = (
+            kit.gear_stats.combat_mp_per_3s_tick() + kit.gear_stats.lucid_dreaming_mp_per_sec * 3.0
+        )
         self.mp_floor = kit.gear_stats.mp_floor()
 
         self.max_hp: dict[str, float] = {
@@ -578,6 +578,7 @@ class CombatEngine:
             hit_killed = False
             for ch in channels:
                 snap_mit = self._event_snapshots_mit.get((ev.id, ch))
+                ch_raw = raw * self.kit.tank_raidwide_damage_ratio if (ev.target_scope == "party" and ch in ("mt", "st")) else raw
                 if ev.mechanic_effect == "set_hp_to_1":
                     # Unmitigable HP=1 mechanic (bypasses mitigation and shields)
                     self.hp[ch] = min(self.hp[ch], 1.0)
@@ -588,7 +589,7 @@ class CombatEngine:
                     pct_dmg = self.max_hp[ch] * ev.hp_percent_fraction
                     killed = self._apply_damage_to_channel(ch, pct_dmg, ev.damage_type, forced_mit_factor=1.0)
                 else:
-                    killed = self._apply_damage_to_channel(ch, raw, ev.damage_type, forced_mit_factor=snap_mit)
+                    killed = self._apply_damage_to_channel(ch, ch_raw, ev.damage_type, forced_mit_factor=snap_mit)
                 if killed:
                     hit_killed = True
                 else:

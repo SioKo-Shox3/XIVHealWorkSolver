@@ -224,6 +224,12 @@ class PlayerKit(BaseModel):
     burst_weave_slots_per_gcd: int = Field(default=0, ge=0, le=2)
     max_hp_party: float = Field(default=120_000.0, gt=0.0)
     max_hp_tank: float = Field(default=190_000.0, gt=0.0)
+    tank_raidwide_damage_ratio: float = Field(
+        default=1.0,
+        gt=0.1,
+        le=1.0,
+        description="Tank armor + Tank Mastery ratio on party-wide hits (set ~0.62 for Lv.100 Savage kits)",
+    )
     on_attack_heal_target: Literal["none", "mt", "st"] = Field(
         default="none",
         description="Optional passive heal on filler attack GCD (e.g. Kardia -> MT); pauses during downtime",
@@ -263,11 +269,7 @@ class PlayerKit(BaseModel):
         for pool in self.resources:
             if pool.name.lower() == "mp":
                 has_mp = True
-                if has_explicit_lucid:
-                    base_regen = (self.gear_stats.combat_mp_per_3s_tick() / 3.0) - (
-                        self.gear_stats.filler_gcd_mp_cost / self.gcd_s
-                    )
-                elif (
+                if (
                     self.gear_stats.filler_gcd_mp_cost > 0
                     or self.gear_stats.lucid_dreaming_mp_per_sec > 0
                     or self.gear_stats.piety != 440

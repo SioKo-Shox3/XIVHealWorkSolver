@@ -1,0 +1,52 @@
+# Verified Lv.100 FFXIV party / co-healer / tank mitigation & healing dictionary (from FFLogs masterData)
+# Keyed by exact FFXIV abilityGameID.
+skills:
+  # Role / DPS mitigations
+  7535: {name: "リプライザル", target_channel: boss, stack_group: reprisal, duration_s: 15.0, mitigation_all: 0.10}
+  7549: {name: "牽制", target_channel: boss, stack_group: feint, duration_s: 15.0, mitigation_physical: 0.10, mitigation_magical: 0.05}
+  7560: {name: "アドル", target_channel: boss, stack_group: addle, duration_s: 15.0, mitigation_magical: 0.10, mitigation_physical: 0.05}
+
+  # Tank party mitigations
+  16471: {name: "ダークミッショナリー", target_channel: party, duration_s: 15.0, mitigation_magical: 0.10, mitigation_physical: 0.05}
+  16160: {name: "ハート・オブ・ライト", target_channel: party, duration_s: 15.0, mitigation_magical: 0.10, mitigation_physical: 0.05}
+  3540:  {name: "ディヴァインヴェール", target_channel: party, duration_s: 30.0, shield_value: 20000, heal_value: 14000}
+  7388:  {name: "シェイクオフ", target_channel: party, duration_s: 30.0, shield_value: 24000, heal_value: 14000}
+
+  # Tank personal mitigations (critical so healer solver knows tanks mitigate their own tankbusters!)
+  7531:  {name: "ランパート", target_channel: mt, duration_s: 20.0, mitigation_all: 0.20}
+  36920: {name: "ガーディアン", target_channel: mt, duration_s: 15.0, mitigation_all: 0.40, shield_value: 22000}
+  36923: {name: "ダムネーション", target_channel: mt, duration_s: 15.0, mitigation_all: 0.40}
+  36927: {name: "シャドウヴィジル", target_channel: mt, duration_s: 15.0, mitigation_all: 0.40}
+  36935: {name: "グレートネビュラ", target_channel: mt, duration_s: 15.0, mitigation_all: 0.40}
+  25746: {name: "ホーリーシェルトロン", target_channel: mt, duration_s: 8.0, mitigation_all: 0.28}
+  25751: {name: "原初の血気", target_channel: mt, duration_s: 8.0, mitigation_all: 0.19, shield_value: 14000}
+  25758: {name: "ハート・オブ・コランダム", target_channel: mt, duration_s: 8.0, mitigation_all: 0.28}
+  7393:  {name: "ブラックナイト", target_channel: mt, duration_s: 7.0, shield_value: 45000}
+  3634:  {name: "ダークマインド", target_channel: mt, duration_s: 10.0, mitigation_magical: 0.20, mitigation_physical: 0.10}
+  22:    {name: "ブルワーク", target_channel: mt, duration_s: 10.0, mitigation_all: 0.15}
+  16140: {name: "カモフラージュ", target_channel: mt, duration_s: 20.0, mitigation_all: 0.10}
+  25754: {name: "オブレーション", target_channel: mt, duration_s: 10.0, mitigation_all: 0.10}
+  7382:  {name: "インターベンション", target_channel: st, duration_s: 8.0, mitigation_all: 0.20}
+  16464: {name: "原初の猛り", target_channel: st, duration_s: 8.0, mitigation_all: 0.19}
+
+  # Pure Healers (WHM / AST)
+  16536: {name: "テンパランス", target_channel: party, duration_s: 20.0, mitigation_all: 0.10}
+  3569:  {name: "アサイラム", target_channel: party, duration_s: 24.0, heal_value: 32000}
+  25862: {name: "リタージー・オブ・ベル", target_channel: party, duration_s: 20.0, heal_value: 45000}
+  25861: {name: "アクアヴェール", target_channel: mt, duration_s: 8.0, mitigation_all: 0.15}
+  3613:  {name: "運命の輪", target_channel: party, duration_s: 15.0, mitigation_all: 0.10, heal_value: 22000}
+  37031: {name: "サンサイン", target_channel: party, duration_s: 15.0, mitigation_all: 0.10}
+  16559: {name: "ニュートラルセクト", target_channel: party, duration_s: 20.0, shield_value: 16000, heal_value: 16000}
+  7439:  {name: "アーサリースター", target_channel: party, duration_s: 10.0, heal_value: 32000}
+  25874: {name: "マクロコスモス", target_channel: party, duration_s: 15.0, heal_value: 38000}
+
+  # Barrier Healers (SCH / SGE) when acting as co-healer
+  188:   {name: "野戦治療の陣", target_channel: party, duration_s: 15.0, mitigation_all: 0.10, heal_value: 22000}
+  25868: {name: "疾風怒濤の計", target_channel: party, duration_s: 20.0, mitigation_all: 0.10}
+  16538: {name: "フェイイルミネーション", target_channel: party, duration_s: 20.0, mitigation_magical: 0.05}
+  16537: {name: "光の囁き", target_channel: party, duration_s: 21.0, heal_value: 34000}
+  16546: {name: "コンソレイション", target_channel: party, duration_s: 30.0, shield_value: 14000, heal_value: 14000}
+  24298: {name: "ケーラコレ", target_channel: party, duration_s: 15.0, mitigation_all: 0.10, heal_value: 20000}
+  24302: {name: "ピュシスII", target_channel: party, duration_s: 15.0, heal_value: 26000}
+  24310: {name: "ホーリズム", target_channel: party, duration_s: 20.0, mitigation_all: 0.10, shield_value: 16000, heal_value: 16000}
+  24311: {name: "パンハイマ", target_channel: party, duration_s: 15.0, shield_value: 28000}

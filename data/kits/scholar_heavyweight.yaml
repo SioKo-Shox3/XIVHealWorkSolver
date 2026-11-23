@@ -1,0 +1,225 @@
+# Lv.100 Scholar (学者) skill kit for AAC Heavyweight Savage (fully data-driven & editable)
+# Tune gcd_s, gear_stats.piety, max_hp_party / max_hp_tank, and planned_raise_reserve to match your exact gear!
+label: "Scholar Lv.100 (2.40s GCD, PIE 800, 1 Raise Reserve)"
+role: healer
+gcd_s: 2.40
+base_weave_slots_per_gcd: 1
+burst_interval_s: 120.0
+burst_duration_s: 20.0
+burst_offset_s: 5.0
+burst_weave_slots_per_gcd: 1
+max_hp_party: 170000
+max_hp_tank: 275000
+tank_raidwide_damage_ratio: 0.62
+
+gear_stats:
+  piety: 800
+  determination: 2500
+  spell_or_skill_speed: 1100
+  heal_scale_multiplier: 1.0
+  filler_gcd_mp_cost: 400.0        # Broil IV = 400 MP / GCD
+  lucid_dreaming_mp_per_sec: 33.3  # Aetherflow (+2000 MP / 60s = +33.3 MP/s); Lucid modeled explicitly below!
+  raise_mp_cost: 2400.0
+  planned_raise_reserve: 1         # Keep >= 2400 MP reserved for emergency Resurrection
+
+resources:
+  - name: mp
+    initial: 10000
+    maximum: 10000
+    regen_per_sec: 66.7
+  - name: aetherflow
+    initial: 3
+    maximum: 3
+    regen_per_sec: 0.05            # Aetherflow 3 stacks / 60s (= 0.05/s)
+
+skills:
+  - id: sacred_soil
+    name: "野戦治療の陣"
+    action_id: 188
+    cooldown_s: 30.0
+    duration_s: 15.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: party
+    mitigation_all: 0.10
+    heal_hot_total: 24000
+    resource_costs:
+      aetherflow: 1
+    lead_time_s: 2.0
+    dps_cost: 0.08                 # Minor ED opportunity cost
+
+  - id: expedient
+    name: "疾風怒濤の計"
+    action_id: 25868
+    cooldown_s: 120.0
+    duration_s: 20.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: party
+    mitigation_all: 0.10
+    lead_time_s: 2.0
+    dps_cost: 0.04
+
+  - id: fey_illumination
+    name: "フェイイルミネーション"
+    action_id: 16538
+    cooldown_s: 120.0
+    duration_s: 20.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: party
+    mitigation_magical: 0.05
+    lead_time_s: 2.5
+    dps_cost: 0.03
+
+  - id: consolation
+    name: "セラフ・コンソレイション"
+    action_id: 16546
+    cooldown_s: 120.0
+    max_charges: 2
+    duration_s: 30.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: party
+    shield_value: 15000            # Independent shield (stacks with Concitation/Deployment!)
+    heal_instant: 15000
+    lead_time_s: 2.5
+    dps_cost: 0.05
+
+  - id: whispering_dawn
+    name: "光の囁き"
+    action_id: 16537
+    cooldown_s: 60.0
+    duration_s: 21.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: party
+    heal_hot_total: 36000
+    lead_time_s: 1.0
+    dps_cost: 0.03
+
+  - id: fey_blessing
+    name: "フェイブレッシング"
+    action_id: 16543
+    cooldown_s: 60.0
+    duration_s: 0.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: party
+    heal_instant: 16000
+    lead_time_s: 0.5
+    dps_cost: 0.03
+
+  - id: indomitability
+    name: "不撓不屈の策"
+    action_id: 3583
+    cooldown_s: 30.0
+    duration_s: 0.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: party
+    heal_instant: 21000
+    resource_costs:
+      aetherflow: 1
+    lead_time_s: 0.5
+    dps_cost: 0.08
+
+  - id: excogitation
+    name: "深謀遠慮の策"
+    action_id: 7434
+    cooldown_s: 45.0
+    duration_s: 45.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: single_ally
+    heal_instant: 40000
+    resource_costs:
+      aetherflow: 1
+    lead_time_s: 2.0
+    dps_cost: 0.08
+
+  - id: protraction
+    name: "生命回生法"
+    action_id: 25867
+    cooldown_s: 60.0
+    duration_s: 10.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: single_ally
+    shield_value: 22000            # Effective +10% tank MaxHP buffer
+    lead_time_s: 2.0
+    dps_cost: 0.03
+
+  - id: seraphism
+    name: "セラフィズム"
+    action_id: 37014
+    cooldown_s: 180.0
+    duration_s: 20.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: party
+    heal_hot_total: 32000
+    shield_value: 18000
+    lead_time_s: 2.0
+    dps_cost: 0.06
+
+  - id: deployment_tactics
+    name: "展開戦術 (秘策鼓舞展開)"
+    action_id: 3585
+    cooldown_s: 90.0
+    duration_s: 30.0
+    cast_time_s: 0.0
+    is_gcd: true
+    weave_cost: 1
+    target_scope: party
+    shield_value: 36000            # Recitation + Adlo -> Deploy huge party barrier
+    shield_stack_group: gcd_barrier
+    resource_costs:
+      mp: 1000
+    lead_time_s: 3.5
+    dps_cost: 0.85
+
+  - id: concitation
+    name: "意気軒昂の策"
+    action_id: 37013
+    cooldown_s: 2.4
+    duration_s: 30.0
+    cast_time_s: 2.0
+    slidecast_window_s: 0.5
+    is_gcd: true
+    weave_cost: 0
+    target_scope: party
+    shield_value: 19000
+    shield_stack_group: gcd_barrier
+    heal_instant: 10000
+    resource_costs:
+      mp: 900
+    lead_time_s: 3.0
+    dps_cost: 1.00
+
+  - id: lucid_dreaming
+    name: "ルーシッドドリーム"
+    action_id: 7562
+    cooldown_s: 60.0
+    duration_s: 21.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: party
+    mp_regen_per_tick: 550.0       # 7 ticks x 550 MP = 3850 MP
+    lead_time_s: 1.0
+    dps_cost: 0.01
+
+  - id: esuna
+    name: "エスナ"
+    action_id: 7568
+    cooldown_s: 2.4
+    duration_s: 0.0
+    cast_time_s: 1.0
+    is_gcd: true
+    weave_cost: 0
+    target_scope: single_ally
+    cleanses_debuff: true
+    resource_costs:
+      mp: 400
+    lead_time_s: 1.0
+    dps_cost: 1.00

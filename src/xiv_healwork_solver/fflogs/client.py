@@ -219,20 +219,42 @@ class FFLogsClient:
         encounter_id: int,
         page: int = 1,
         metric: str = "rdps",
+        difficulty: int = 101,
+        spec_name: str | None = None,
     ) -> list[dict[str, Any]]:
-        """Fetch ranked clear reports for an encounter (useful for PF aggregate learning)."""
+        """Fetch ranked clear reports for an encounter (difficulty=101 for Savage)."""
         q = """
-        query ($encounterID: Int!, $page: Int!, $metric: CharacterRankingMetricType) {
+        query (
+          $encounterID: Int!,
+          $page: Int!,
+          $metric: CharacterRankingMetricType,
+          $difficulty: Int,
+          $specName: String
+        ) {
           worldData {
             encounter(id: $encounterID) {
               id
               name
-              characterRankings(page: $page, metric: $metric)
+              characterRankings(
+                page: $page
+                metric: $metric
+                difficulty: $difficulty
+                specName: $specName
+              )
             }
           }
         }
         """
-        enc = self.query(q, {"encounterID": encounter_id, "page": page, "metric": metric})["worldData"]["encounter"]
+        enc = self.query(
+            q,
+            {
+                "encounterID": encounter_id,
+                "page": page,
+                "metric": metric,
+                "difficulty": difficulty,
+                "specName": spec_name,
+            },
+        )["worldData"]["encounter"]
         rankings = (enc.get("characterRankings") or {}).get("rankings") or []
         out: list[dict[str, Any]] = []
         for r in rankings:
@@ -241,10 +263,30 @@ class FFLogsClient:
                 out.append(
                     {
                         "report_code": rep["code"],
-                        "fight_id": rep["fightID"],
+                        "fight_id": int(rep["fightID"]),
                         "character_name": r.get("name"),
                         "spec": r.get("spec"),
                         "duration_ms": r.get("duration"),
+                        "amount": r.get("amount"),
                     }
                 )
         return out
+
+    def get_fight_table(
+        self,
+        report_code: str,
+        fight_id: int,
+        data_type: str = "Summary",
+    ) -> dict[str, Any]:
+        """Fetch FFLogs summary/healing/damage/deaths table for quality curation."""
+        q = """
+        query ($code: String!, $fightIDs: [Int], $dataType: TableDataType) {
+          reportData {
+            report(code: $code) {
+              table(fightIDs: $fightIDs, dataType: $dataType)
+            }
+          }
+        }
+        """
+        res = self.query(q, {"code": report_code, "fightIDs": [fight_id], "dataType": data_type})
+        return (res["reportData"]["report"].get("table") or {}).get("data") or {}
