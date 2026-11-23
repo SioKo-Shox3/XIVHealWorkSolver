@@ -9,8 +9,11 @@ import yaml
 from xiv_healwork_solver.fflogs.client import FFLogsClient
 from xiv_healwork_solver.fflogs.curator import curate_fight_candidates
 from xiv_healwork_solver.fflogs.extractor import (
+    _identify_tank_slots,
     extract_damage_timeline,
+    extract_partner_healing_pulses,
     extract_partner_probabilities,
+    extract_player_expert_actions,
 )
 from xiv_healwork_solver.models import (
     EncounterTimeline,
@@ -148,8 +151,26 @@ def build_curated_encounter_timeline(
         min_raw_damage=35_000.0,
     )
 
-    # Extract partner / co-healer / tank cast streams across all selected curated clears
+    # Extract partner / co-healer / tank cast & real healing streams across selected curated clears
+    # Determine target_spec's actual tank slot (mt vs st) in the canonical fight `top`
+    # so partner tank exclusion stays 100% consistent with damage routing even when other clears swap MT/ST jobs!
+    f0_fids = set(f0.get("friendlyPlayers") or [])
+    f0_actors = {
+        int(a["id"]): a
+        for a in ov0["masterData"]["actors"]
+        if (not f0_fids or int(a["id"]) in f0_fids)
+        and str(a.get("subType", "")).lower() not in ("limitbreak", "npc", "unknown")
+    }
+    top_tank_slots = _identify_tank_slots(dmg_events, f0_actors, abilities0, {"attack", "shot", "攻撃"})
+    self_tank_slot: str | None = None
+    if target_spec in TANK_SPECS:
+        for aid, a in f0_actors.items():
+            if str(a.get("subType", "")).lower() == target_spec.lower() and aid in top_tank_slots:
+                self_tank_slot = top_tank_slots[aid]
+                break
+
     cast_streams: list[dict[str, Any]] = []
+    heal_streams: list[dict[str, Any]] = []
     exclude_names: set[str] = set()
     for rep in selected:
         ov = ov0 if rep.report_code == top.report_code else c.get_report_overview(rep.report_code)
@@ -161,11 +182,8 @@ def build_curated_encounter_timeline(
             int(a["id"]): a
             for a in ov["masterData"]["actors"]
             if (not fids or int(a["id"]) in fids)
+            and str(a.get("subType", "")).lower() not in ("limitbreak", "npc", "unknown")
         }
-        # Exclude the target_spec player (e.g. Scholar) so partner_profile contains ONLY co-healer/tank/DPS!
-        for a in actors.values():
-            if str(a.get("subType", "")).lower() == target_spec.lower():
-                exclude_names.add(str(a.get("name", "")))
         casts = c.get_fight_events(
             report_code=rep.report_code,
             fight_id=rep.fight_id,
@@ -174,12 +192,51 @@ def build_curated_encounter_timeline(
             data_type="Casts",
             hostility_type="Friendlies",
         )
+        heals = c.get_fight_events(
+            report_code=rep.report_code,
+            fight_id=rep.fight_id,
+            start_time=float(f["startTime"]),
+            end_time=float(f["endTime"]),
+            data_type="Healing",
+            hostility_type="Friendlies",
+        )
+        f_dmg = dmg_events if (rep.report_code == top.report_code and rep.fight_id == top.fight_id) else c.get_fight_events(
+            report_code=rep.report_code,
+            fight_id=rep.fight_id,
+            start_time=float(f["startTime"]),
+            end_time=float(f["endTime"]),
+            data_type="DamageTaken",
+            hostility_type="Friendlies",
+        )
+        f_abs = {int(a["gameID"]): a for a in ov["masterData"]["abilities"]}
+        t_slots = _identify_tank_slots(f_dmg, actors, f_abs, {"attack", "shot", "攻撃"})
+        # Exclude self slot cleanly: for tanks exclude the tank in `self_tank_slot` (mt or st); for healers exclude target_spec
+        if self_tank_slot is not None:
+            for aid, slot in t_slots.items():
+                if slot == self_tank_slot and aid in actors:
+                    exclude_names.add(str(actors[aid].get("name", "")))
+        else:
+            for a in actors.values():
+                if str(a.get("subType", "")).lower() == target_spec.lower():
+                    exclude_names.add(str(a.get("name", "")))
+        all_actors = {int(a["id"]): a for a in ov["masterData"]["actors"]}
         cast_streams.append(
             {
                 "fight_start_ms": float(f["startTime"]),
                 "fight_end_ms": float(f["endTime"]),
                 "casts": casts,
                 "actors_by_id": actors,
+                "tank_slot_by_id": t_slots,
+            }
+        )
+        heal_streams.append(
+            {
+                "fight_start_ms": float(f["startTime"]),
+                "fight_end_ms": float(f["endTime"]),
+                "heals": heals,
+                "actors_by_id": actors,
+                "all_actors_by_id": all_actors,
+                "tank_slot_by_id": t_slots,
             }
         )
 
@@ -189,36 +246,25 @@ def build_curated_encounter_timeline(
         known_skill_effects=known_skills,
         exclude_actor_names=exclude_names,
     )
-    timeline.partner_profile = partner_probs
-
-    # Estimate co-healer & tank baseline effective healing per 3s tick from cached Healing tables!
-    cohealer_party_ticks: list[float] = []
-    mt_self_ticks: list[float] = []
-    st_self_ticks: list[float] = []
-    for rep in selected:
-        ht = healing_tables.get((rep.report_code, rep.fight_id)) or {}
-        dur_s = max(1.0, rep.duration_s)
-        co_eff = 0.0
-        tank_effs: list[float] = []
-        for e in (ht.get("entries") or []):
-            spec = str(e.get("type", ""))
-            eff = float(e.get("total") or 0.0)
-            if spec in HEALER_SPECS and spec.lower() != target_spec.lower():
-                co_eff += eff
-            elif spec in TANK_SPECS:
-                tank_effs.append(eff)
-        # Co-healer effective healing spread across 8 party members (net ~75% after big CDs already in partner_profile)
-        if co_eff > 0:
-            cohealer_party_ticks.append((co_eff * 0.75 / 8.0) / dur_s * 3.0)
-        if tank_effs:
-            tank_effs.sort(reverse=True)
-            mt_self_ticks.append((tank_effs[0] / dur_s) * 3.0)
-            if len(tank_effs) >= 2:
-                st_self_ticks.append((tank_effs[1] / dur_s) * 3.0)
-
-    timeline.partner_baseline_healing = PartnerBaselineHealing(
-        party_per_3s_tick=round(sum(cohealer_party_ticks) / len(cohealer_party_ticks), 1) if cohealer_party_ticks else 0.0,
-        mt_per_3s_tick=round(sum(mt_self_ticks) / len(mt_self_ticks), 1) if mt_self_ticks else 0.0,
-        st_per_3s_tick=round(sum(st_self_ticks) / len(st_self_ticks), 1) if st_self_ticks else 0.0,
+    # Strip heal_value and shield_value from cast-based partner probs since exact real Healing+Absorbed pulses cover both!
+    mit_only_probs = [
+        p.model_copy(update={"heal_value": 0.0, "shield_value": 0.0})
+        for p in partner_probs
+        if (p.mitigation_all > 0 or p.mitigation_physical > 0 or p.mitigation_magical > 0)
+    ]
+    pet_names_by_spec: dict[str, set[str]] = {
+        "scholar": {"eos", "seraph", "selene", "フェアリー・エオス", "セラフィム"},
+        "whitemage": {"liturgic bell", "リタージー・オブ・ベル"},
+        "astrologian": {"earthly star", "アーサリースター"},
+    }
+    heal_pulses = extract_partner_healing_pulses(
+        timeline=timeline,
+        fights_heal_streams=heal_streams,
+        exclude_actor_names=exclude_names,
+        exclude_pet_names=pet_names_by_spec.get(target_spec.lower(), set()),
     )
+    timeline.partner_profile = mit_only_probs + heal_pulses
+
+    # Empirical timed partner healing pulses already capture 100% of partner healing without double-counting!
+    timeline.partner_baseline_healing = PartnerBaselineHealing()
     return timeline, accepted, rejected

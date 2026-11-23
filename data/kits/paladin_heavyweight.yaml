@@ -1,0 +1,137 @@
+# Lv.100 Paladin (ナイト) skill kit for AAC Heavyweight Savage (fully data-driven & editable)
+# Demonstrates job-specific Tank resource mechanics: Oath Gauge (オウス) generated strictly by
+# the player's own auto-attacks (`gain_per_player_aa: 5.0`, automatically pausing during downtime!).
+label: "Paladin Lv.100 (2.50s GCD, TEN 1400, Oath AA Gauge)"
+role: tank
+player_is_mt: true
+gcd_s: 2.50
+player_aa_interval_s: 2.24
+base_weave_slots_per_gcd: 2
+burst_interval_s: 60.0
+burst_duration_s: 15.0
+burst_offset_s: 5.0
+burst_weave_slots_per_gcd: 1
+max_hp_party: 180000
+max_hp_tank: 280000
+tank_raidwide_damage_ratio: 0.62
+on_attack_heal_target: mt
+on_attack_heal_value: 6000          # Holy Spirit / Confiteor combo self-heal averaged per GCD (pauses in downtime!)
+
+gear_stats:
+  tenacity: 1400
+  determination: 2400
+  spell_or_skill_speed: 420
+  heal_scale_multiplier: 1.0
+
+resources:
+  - name: oath
+    initial: 0.0
+    maximum: 100.0
+    gain_per_player_aa: 5.0         # +5 Oath on every Paladin auto-attack while boss is targetable!
+
+skills:
+  - id: reprisal
+    name: "リプライザル"
+    action_id: 7535
+    cooldown_s: 60.0
+    duration_s: 15.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: boss_debuff
+    requires_targetable_boss: true
+    mitigation_all: 0.10
+    stack_group: reprisal
+    lead_time_s: 2.0
+    dps_cost: 0.02
+
+  - id: divine_veil
+    name: "ディヴァインヴェール"
+    action_id: 3540
+    cooldown_s: 90.0
+    duration_s: 30.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: party
+    shield_max_hp_ratio: 0.10       # Party barrier (~10% PLD MaxHP) + instant heal
+    heal_instant: 14000
+    lead_time_s: 3.0
+    dps_cost: 0.03
+
+  - id: passage_of_arms
+    name: "パッセージ・オブ・アームズ"
+    action_id: 7385
+    cooldown_s: 120.0
+    duration_s: 5.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: party
+    mitigation_all: 0.15
+    lead_time_s: 1.5
+    dps_cost: 0.08
+
+  - id: rampart
+    name: "ランパート"
+    action_id: 7531
+    cooldown_s: 90.0
+    duration_s: 20.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: self
+    mitigation_all: 0.20
+    lead_time_s: 2.5
+    dps_cost: 0.04
+
+  - id: guardian
+    name: "ガーディアン (40%大バフ)"
+    action_id: 36920
+    cooldown_s: 120.0
+    duration_s: 15.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: self
+    mitigation_all: 0.40
+    shield_value: 25000             # Guardian's Will barrier
+    lead_time_s: 2.5
+    dps_cost: 0.06
+
+  - id: bulwark
+    name: "ブルワーク"
+    action_id: 22
+    cooldown_s: 90.0
+    duration_s: 10.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: self
+    mitigation_all: 0.15            # 100% block rate (~15-20% mitigation)
+    lead_time_s: 2.0
+    dps_cost: 0.03
+
+  - id: holy_sheltron
+    name: "ホーリーシェルトロン (オウス50)"
+    action_id: 25746
+    cooldown_s: 5.0
+    duration_s: 8.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: self
+    mitigation_all: 0.25            # Knight's Resolve 15% + Holy Sheltron 15% (~27% first 4s, ~15% next 4s)
+    heal_hot_total: 24000
+    resource_costs:
+      oath: 50
+    lead_time_s: 1.5
+    dps_cost: 0.02
+
+  - id: intervention
+    name: "インターベンション (オウス50)"
+    action_id: 7382
+    cooldown_s: 10.0
+    duration_s: 8.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: single_ally
+    mitigation_all: 0.20
+    heal_hot_total: 20000
+    resource_costs:
+      oath: 50
+    lead_time_s: 1.5
+    dps_cost: 0.02

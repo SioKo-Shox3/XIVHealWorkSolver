@@ -1,0 +1,131 @@
+# Lv.100 Dark Knight (暗黒騎士) skill kit for AAC Heavyweight Savage (fully data-driven & editable)
+# Includes continuous boss AA handling, combo self-heal (pauses during downtime), Tenacity passive mitigation,
+# and pre-pull TBN preparation!
+label: "Dark Knight Lv.100 (2.50s GCD, TEN 1400)"
+role: tank
+player_is_mt: true
+gcd_s: 2.50
+base_weave_slots_per_gcd: 2
+burst_interval_s: 120.0
+burst_duration_s: 20.0
+burst_offset_s: 5.0
+burst_weave_slots_per_gcd: 1
+max_hp_party: 180000
+max_hp_tank: 280000
+tank_raidwide_damage_ratio: 0.62
+on_attack_heal_target: mt
+on_attack_heal_value: 7500          # Souleater / combo self-heal averaged per GCD (pauses in downtime!)
+
+gear_stats:
+  tenacity: 1400                    # Passive ~3.9% mitigation on self-targeted tank hits & AAs
+  determination: 2400
+  spell_or_skill_speed: 420
+  heal_scale_multiplier: 1.0
+
+prepull_actions:
+  - skill_id: blackest_night
+    offset_s: -2.0
+    target_channel: mt
+    consumes_cooldown: true
+    consumes_mp: true
+
+resources:
+  - name: mp
+    initial: 10000
+    maximum: 10000
+    regen_per_sec: 120.0            # Natural MP + Syphon Strike + Blood Weapon/Delirium MP
+
+skills:
+  - id: reprisal
+    name: "リプライザル"
+    action_id: 7535
+    cooldown_s: 60.0
+    duration_s: 15.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: boss_debuff
+    requires_targetable_boss: true
+    mitigation_all: 0.10
+    stack_group: reprisal
+    lead_time_s: 2.0
+    dps_cost: 0.02
+
+  - id: dark_missionary
+    name: "ダークミッショナリー"
+    action_id: 16471
+    cooldown_s: 90.0
+    duration_s: 15.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: party
+    mitigation_magical: 0.10
+    mitigation_physical: 0.05
+    lead_time_s: 2.0
+    dps_cost: 0.03
+
+  - id: rampart
+    name: "ランパート"
+    action_id: 7531
+    cooldown_s: 90.0
+    duration_s: 20.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: self
+    mitigation_all: 0.20
+    lead_time_s: 2.5
+    dps_cost: 0.04
+
+  - id: shadowed_vigil
+    name: "シャドウヴィジル (40%大バフ)"
+    action_id: 36927
+    cooldown_s: 120.0
+    duration_s: 15.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: self
+    mitigation_all: 0.40
+    delayed_heal_value: 55000       # Vigilant reactive heal when HP < 50% or on expiry
+    delayed_heal_trigger_ratio: 0.50
+    lead_time_s: 2.5
+    dps_cost: 0.06
+
+  - id: dark_mind
+    name: "ダークマインド"
+    action_id: 3634
+    cooldown_s: 60.0
+    duration_s: 10.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: self
+    mitigation_magical: 0.20
+    mitigation_physical: 0.10
+    lead_time_s: 2.0
+    dps_cost: 0.03
+
+  - id: oblation
+    name: "オブレーション"
+    action_id: 25754
+    cooldown_s: 60.0
+    max_charges: 2
+    duration_s: 10.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: single_ally
+    mitigation_all: 0.10
+    lead_time_s: 2.0
+    dps_cost: 0.02
+
+  - id: blackest_night
+    name: "ブラックナイト"
+    action_id: 7393
+    cooldown_s: 15.0
+    duration_s: 7.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: single_ally
+    shield_value: 0
+    shield_max_hp_ratio: 0.25       # Exact 25% of target Max HP (bypasses heal_scale!)
+    resource_costs:
+      mp: 3000
+    lead_time_s: 1.5
+    dps_cost: 0.03

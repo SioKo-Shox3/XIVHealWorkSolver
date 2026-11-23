@@ -1,6 +1,7 @@
 """Extract normalized timelines, AA segments, DoTs, partner probabilities, and weave windows from FFLogs."""
 from __future__ import annotations
 
+import math
 from collections import defaultdict
 from statistics import mean, pstdev
 from typing import Any
@@ -176,6 +177,9 @@ def extract_damage_timeline(
         dmg_type = _infer_damage_type(ab.get("type"))
 
         if ev.get("tick"):
+            # Skip FFLogs's synthetic roll-up ability 500000 ("Combined DoTs") to avoid double-counting real DoTs
+            if ability_id == 500000 or ab_name.lower() == "combined dots":
+                continue
             if unmit > 0:
                 dot_ticks.append(
                     {
@@ -187,9 +191,9 @@ def extract_damage_timeline(
                 )
             continue
 
-        # Detect tank auto-attacks separately from major mechanics
+        # Detect tank auto-attacks strictly by AA ability name (never sweep low-damage boss mechanics like Brutal Rain!)
         is_tank_target = target_id is not None and int(target_id) in tank_slot_by_id
-        if is_tank_target and (ab_name.lower() in aa_names or (unmit < min_raw_damage and unmit >= 3_000.0)):
+        if is_tank_target and ab_name.lower() in aa_names and unmit >= 3_000.0:
             aa_hits.append(
                 {
                     "time_s": rel_s,
@@ -221,25 +225,38 @@ def extract_damage_timeline(
 
     hits.sort(key=lambda h: h["time_s"])
 
-    # 2. Cluster major hits by ability within cluster_window_s
+    # 2. Cluster major hits by ability within cluster_window_s, AND merge disjoint-target split waves
+    # (e.g. 4+4 Blast Beat or 2+2+2+2 Aetherletting where each player only gets hit once across waves!)
     clusters: list[list[dict[str, Any]]] = []
+    cluster_targets: list[set[int]] = []
     for h in hits:
         placed = False
-        for cl in reversed(clusters):
-            if h["time_s"] - cl[-1]["time_s"] > cluster_window_s:
+        tid = int(h["target_id"]) if h["target_id"] is not None else -1
+        for ci in range(len(clusters) - 1, -1, -1):
+            cl = clusters[ci]
+            dt_last = h["time_s"] - cl[-1]["time_s"]
+            if dt_last > 8.0:
                 break
-            if cl[0]["ability_id"] == h["ability_id"]:
+            if cl[0]["ability_id"] != h["ability_id"]:
+                continue
+            # Same hit cluster within cluster_window_s, OR disjoint-target wave within 6.0s!
+            if dt_last <= cluster_window_s or (dt_last <= 6.0 and tid != -1 and tid not in cluster_targets[ci]):
                 cl.append(h)
+                if tid != -1:
+                    cluster_targets[ci].add(tid)
                 placed = True
                 break
         if not placed:
             clusters.append([h])
+            cluster_targets.append({tid} if tid != -1 else set())
 
     consumed_dot_indices: set[int] = set()
     events: list[DamageEvent] = []
+    event_nontank_targets: list[set[int]] = []
     for idx, cl in enumerate(clusters, start=1):
         unique_targets = {int(x["target_id"]) for x in cl if x["target_id"] is not None}
         tank_slots_hit = {tank_slot_by_id[tid] for tid in unique_targets if tid in tank_slot_by_id}
+        nontank_targets = {tid for tid in unique_targets if tid not in tank_slot_by_id}
 
         if len(unique_targets) >= 4:
             scope = "party"
@@ -250,6 +267,10 @@ def extract_damage_timeline(
         elif len(unique_targets) >= 2:
             scope = "party"
         else:
+            # In a full party log (>=4 actors), a 1-target hit on a non-tank is an avoidable AoE clip
+            # (e.g. one player eating Half Moon) or single-player bait, NOT a party-wide raidwide.
+            if len(actors_by_id) >= 4 and not tank_slots_hit:
+                continue
             scope = "party"
 
         # Use true non-zero unmitigated hits from non-tank targets for party raidwides (avoids 100%-shielded zeros & tank armor bias)
@@ -278,21 +299,49 @@ def extract_damage_timeline(
                 matching_dots.append(d["raw_damage"])
         dot_per_target = (sum(matching_dots) / max(1, len(unique_targets))) if matching_dots else 0.0
 
-        events.append(
-            DamageEvent(
-                id=f"e{idx}_{cl[0]['ability_id']}_{int(first_t)}",
-                time_s=round(first_t, 2),
-                snapshot_time_s=snap_t if snap_t < round(first_t, 2) else None,
-                name=cl[0]["ability_name"],
-                ability_id=cl[0]["ability_id"],
-                damage_type=cl[0]["damage_type"],
-                target_scope=scope,  # type: ignore[arg-type]
-                raw_damage=round(avg_raw * hit_count, 1),
-                hit_count=hit_count,
-                hit_interval_s=hit_interval,
-                dot_total_damage=round(dot_per_target, 1),
-            )
+        cand = DamageEvent(
+            id=f"e{idx}_{cl[0]['ability_id']}_{int(first_t)}",
+            time_s=round(first_t, 2),
+            snapshot_time_s=snap_t if snap_t < round(first_t, 2) else None,
+            name=cl[0]["ability_name"],
+            ability_id=cl[0]["ability_id"],
+            damage_type=cl[0]["damage_type"],
+            target_scope=scope,  # type: ignore[arg-type]
+            raw_damage=round(avg_raw * hit_count, 1),
+            hit_count=hit_count,
+            hit_interval_s=hit_interval,
+            dot_total_damage=round(dot_per_target, 1),
         )
+
+        # Merge simultaneous disjoint-target split-party mechanics (e.g. Spread on group A + Lash on group B within 2.0s)
+        # so the single `party` channel is not hit twice by mutually exclusive mechanics!
+        merged_disjoint = False
+        if scope == "party" and nontank_targets:
+            for prev_i in range(len(events) - 1, -1, -1):
+                prev_ev = events[prev_i]
+                if cand.time_s - prev_ev.time_s > 2.0:
+                    break
+                if (
+                    prev_ev.target_scope == "party"
+                    and event_nontank_targets[prev_i]
+                    and event_nontank_targets[prev_i].isdisjoint(nontank_targets)
+                ):
+                    if cand.raw_damage > prev_ev.raw_damage:
+                        events[prev_i] = prev_ev.model_copy(
+                            update={
+                                "raw_damage": cand.raw_damage,
+                                "name": f"{prev_ev.name} / {cand.name}" if cand.name != prev_ev.name else prev_ev.name,
+                            }
+                        )
+                    elif cand.name != prev_ev.name and cand.name not in prev_ev.name:
+                        events[prev_i] = prev_ev.model_copy(update={"name": f"{prev_ev.name} / {cand.name}"})
+                    event_nontank_targets[prev_i] |= nontank_targets
+                    merged_disjoint = True
+                    break
+
+        if not merged_disjoint:
+            events.append(cand)
+            event_nontank_targets.append(set(nontank_targets))
 
     # Preserve standalone / differently-IDed DoTs as their own events so bleeds never vanish
     unmatched_dots = [d for i, d in enumerate(dot_ticks) if i not in consumed_dot_indices]
@@ -311,7 +360,20 @@ def extract_damage_timeline(
         for dcl in dot_clusters:
             u_targs = {int(x["target_id"]) for x in dcl if x["target_id"] is not None}
             t_slots = {tank_slot_by_id[tid] for tid in u_targs if tid in tank_slot_by_id}
-            d_scope = next(iter(t_slots)) if (len(u_targs) == 1 and len(t_slots) == 1) else ("both_tanks" if (len(u_targs) == 2 and t_slots == {"mt", "st"}) else "party")
+            nt_targs = {tid for tid in u_targs if tid not in tank_slot_by_id}
+            if len(actors_by_id) >= 4:
+                # In full-party logs, only broadcast as party-wide DoT if >=3 non-tanks received it;
+                # otherwise route to affected tank slot(s) or ignore 1-2 player avoidable puddle bleeds.
+                if len(nt_targs) >= 3:
+                    d_scope = "party"
+                elif t_slots == {"mt", "st"}:
+                    d_scope = "both_tanks"
+                elif len(t_slots) == 1:
+                    d_scope = next(iter(t_slots))
+                else:
+                    continue
+            else:
+                d_scope = next(iter(t_slots)) if (len(u_targs) == 1 and len(t_slots) == 1) else ("both_tanks" if (len(u_targs) == 2 and t_slots == {"mt", "st"}) else "party")
             ab = abilities_by_id.get(dcl[0]["ability_id"], {})
             d_total = sum(x["raw_damage"] for x in dcl) / max(1, len(u_targs))
             d_dur = max(3.0, round(dcl[-1]["time_s"] - dcl[0]["time_s"] + 3.0, 1))
@@ -340,15 +402,22 @@ def extract_damage_timeline(
         seg_hits: list[dict[str, Any]] = [aa_hits[0]]
 
         def _flush_aa(sh: list[dict[str, Any]]) -> None:
-            intervals = [b["time_s"] - a["time_s"] for a, b in zip(sh, sh[1:]) if b["time_s"] > a["time_s"]]
+            start_s = round(sh[0]["time_s"], 2)
+            end_s = round(sh[-1]["time_s"], 2)
+            if len(sh) > 1 and end_s > start_s:
+                # Floor-clamp interval to 0.001s so start_s + (n-1)*interval_s <= end_s never drops the last AA hit!
+                exact_int = (end_s - start_s) / (len(sh) - 1)
+                interval_s = max(1.5, math.floor(exact_int * 1000.0) / 1000.0)
+            else:
+                interval_s = 3.0
             auto_attacks.append(
                 AutoAttackSegment(
-                    start_s=round(sh[0]["time_s"], 2),
-                    end_s=round(sh[-1]["time_s"], 2),
+                    start_s=start_s,
+                    end_s=end_s,
                     target=sh[0]["target_slot"],  # type: ignore[arg-type]
                     damage_type=sh[0]["damage_type"],
                     raw_damage_per_hit=round(mean(x["raw_damage"] for x in sh), 1),
-                    interval_s=round(max(1.5, mean(intervals)), 2) if intervals else 3.0,
+                    interval_s=interval_s,
                 )
             )
 
@@ -441,7 +510,8 @@ def extract_partner_probabilities(
                 or float(eff.get("shield_value", 0.0)) > 0
             )
             dur_s = float(eff.get("duration_s", 15.0))
-            effective_pre = min(pre_window_s, max(2.0, dur_s))
+            # Include FFXIV ~0.8s buff application latency so 15s mits cast ~15.5s pre-snapshot still match
+            effective_pre = min(max(pre_window_s, 16.0), max(2.0, dur_s + 0.8))
 
             for dmg_ev in timeline.events:
                 if fight_dur_s < dmg_ev.time_s - 0.5:
@@ -492,6 +562,288 @@ def extract_partner_probabilities(
         )
     results.sort(key=lambda x: (x.event_id, -x.probability))
     return results
+
+
+def extract_partner_healing_pulses(
+    timeline: EncounterTimeline,
+    fights_heal_streams: list[dict[str, Any]],
+    exclude_actor_names: set[str] | None = None,
+    exclude_pet_names: set[str] | None = None,
+    min_pulse_hp: float = 500.0,
+    max_bin_s: float = 6.0,
+) -> list[PartnerActionProb]:
+    """Extract empirical timed partner effective healing & absorbed shields from FFLogs Healing streams.
+
+    Buckets each inter-event window into empirical <=6s sub-bins (and per-hit slots during multi-hit
+    stacks) placed at the actual amount-weighted mean timestamp. Excludes FFLogs synthetic `Combined HoTs`
+    (ID 500001) and the target player's own pets, preserves unpaired positive `calculatedheal` records,
+    and marks non-tank `party` pulses `non_tank_only=True` so tanks are never double-healed.
+    """
+    exclude_set = {n.lower() for n in (exclude_actor_names or set())}
+    exclude_pets = {n.lower() for n in (exclude_pet_names or set())}
+    events = sorted(timeline.events, key=lambda e: e.time_s)
+    if not events or not fights_heal_streams:
+        return []
+
+    # Precompute contiguous event intervals and explicit sub-bin boundaries [(b_lo, b_hi), ...].
+    # For multi-hit events, explicitly split at last_hit_t so post-stack recovery heals are never pulled before the final hit!
+    # (eid, ev_snap_t, lo, hi, bins)
+    base_windows: list[tuple[str, float, float, float, list[tuple[float, float]]]] = []
+    for idx, ev in enumerate(events):
+        lo = 0.0 if idx == 0 else max(0.0, ev.time_s - 1.0)
+        hi = (events[idx + 1].time_s - 1.0) if idx + 1 < len(events) else timeline.duration_s
+        if hi <= lo:
+            continue
+        bins: list[tuple[float, float]] = []
+        sub_spans: list[tuple[float, float]] = []
+        if ev.hit_count > 1 and ev.hit_interval_s > 0.0:
+            last_hit_t = ev.time_s + (ev.hit_count - 1) * ev.hit_interval_s + 0.05
+            if lo < last_hit_t < hi:
+                # Split multi-hit stacks per inter-hit slot so mid-stack heals (e.g. Bell/Ixochole)
+                # land between the exact hits they occurred on instead of overhealing in one lump!
+                prev_b = lo
+                for h_i in range(1, ev.hit_count):
+                    h_t = min(last_hit_t, ev.time_s + h_i * ev.hit_interval_s)
+                    if h_t > prev_b + 0.05:
+                        bins.append((prev_b, h_t))
+                        prev_b = h_t
+                if last_hit_t > prev_b + 0.05:
+                    bins.append((prev_b, last_hit_t))
+                sub_spans.append((last_hit_t, hi))
+            else:
+                sub_spans.append((lo, hi))
+        else:
+            sub_spans.append((lo, hi))
+        for s_lo, s_hi in sub_spans:
+            n_b = max(1, math.ceil((s_hi - s_lo) / max(1.0, max_bin_s)))
+            w_b = (s_hi - s_lo) / n_b
+            for k in range(n_b):
+                bins.append((s_lo + k * w_b, s_lo + (k + 1) * w_b))
+        base_windows.append((ev.id, ev.effective_snapshot_time(), lo, hi, bins))
+
+    # Accumulate per-(eid, bin_idx, channel): list of per-pull effective healing & empirical partner shields
+    per_bin_vals: dict[tuple[str, int, str], list[float]] = defaultdict(list)
+    per_bin_wtime: dict[tuple[str, int, str], float] = defaultdict(float)
+    per_bin_wsum: dict[tuple[str, int, str], float] = defaultdict(float)
+
+    per_bin_shield_vals: dict[tuple[str, int, str], list[float]] = defaultdict(list)
+    per_bin_shield_wtime: dict[tuple[str, int, str], float] = defaultdict(float)
+    per_bin_shield_wsum: dict[tuple[str, int, str], float] = defaultdict(float)
+
+    ev_by_id = {e.id: e for e in events}
+
+    for bundle in fights_heal_streams:
+        t0 = float(bundle["fight_start_ms"])
+        t_end = float(bundle.get("fight_end_ms", t0 + timeline.duration_s * 1000.0))
+        dur_s = max(0.0, (t_end - t0) / 1000.0)
+        heals = bundle["heals"]
+        actors_by_id: dict[int, dict[str, Any]] = bundle["actors_by_id"]
+
+        tank_ids = [int(aid) for aid, a in sorted(actors_by_id.items()) if _actor_role_from_subtype(a.get("subType")) == "tank"]
+        tank_slot = bundle.get("tank_slot_by_id") or (
+            {tank_ids[0]: "mt", **({tank_ids[1]: "st"} if len(tank_ids) > 1 else {})} if tank_ids else {}
+        )
+        # Count ONLY real combat non-tank players (FFLogs puts LimitBreak / Multiple Players inside friendlyPlayers!)
+        non_tank_count = max(
+            1,
+            sum(
+                1
+                for aid, a in actors_by_id.items()
+                if aid not in tank_slot
+                and str(a.get("type", "Player")).lower() == "player"
+                and str(a.get("subType", "")).lower() not in ("limitbreak", "npc", "pet", "unknown")
+            ),
+        )
+
+        active_windows = [w for w in base_windows if dur_s >= w[2] + 0.5]
+        fight_sums: dict[tuple[str, int, str], float] = defaultdict(float)
+        fight_shield_sums: dict[tuple[str, int, str], float] = defaultdict(float)
+        all_actors_by_id: dict[int, dict[str, Any]] = bundle.get("all_actors_by_id") or actors_by_id
+
+        # Track packetIDs that have a resolved `heal` event so unpaired `calculatedheal` records are preserved without duplication
+        seen_heal_packets: set[tuple[int, int]] = set()
+        for ev in heals:
+            if ev.get("type") == "heal" and ev.get("packetID") is not None:
+                seen_heal_packets.add((int(ev["packetID"]), int(ev.get("targetID", -1))))
+
+        for ev in heals:
+            ev_type = ev.get("type")
+            if ev_type == "calculatedheal":
+                pkt = ev.get("packetID")
+                tid_chk = int(ev.get("targetID", -1))
+                if pkt is not None and (int(pkt), tid_chk) in seen_heal_packets:
+                    continue
+                if pkt is None:
+                    continue
+                ev_type = "heal"
+            elif ev_type not in ("heal", "absorbed"):
+                continue
+            # Skip FFLogs synthetic Combined HoTs (500001) to prevent double-counting real HoT ticks!
+            ab_id = int(ev.get("abilityGameID", 0))
+            if ab_id in (500000, 500001):
+                continue
+            amt = float(ev.get("amount") or 0.0)
+            oh = float(ev.get("overheal") or 0.0) if ev_type == "heal" else 0.0
+            # Include a modest share of logged partner overheal (35%) so real partner HoTs/AoEs
+            # (e.g. Asylum ticks that hit 100% HP in one pull) still top the party up under +5% rolls
+            # without erasing the need for the player's own mitigations/heals.
+            eff_amt = amt + 0.35 * oh
+            if eff_amt <= 0.0:
+                continue
+            src_id = int(ev.get("sourceID", -1))
+            src = all_actors_by_id.get(src_id) or actors_by_id.get(src_id, {})
+            src_name = str(src.get("name", "")).lower()
+            if src_name in exclude_set:
+                continue
+            if str(src.get("type", "")).lower() == "pet" and src_name in exclude_pets:
+                continue
+            rel_s = (float(ev["timestamp"]) - t0) / 1000.0
+            tid = int(ev.get("targetID", -1))
+            if tid not in actors_by_id and tid not in tank_slot:
+                continue
+            ch = tank_slot.get(tid, "party")
+
+            for eid, snap_t, lo, hi, bins in active_windows:
+                if lo <= rel_s < hi:
+                    b_idx = len(bins) - 1
+                    for bi, (b_lo, b_hi) in enumerate(bins):
+                        if b_lo <= rel_s < b_hi:
+                            b_idx = bi
+                            break
+                    norm_amt = eff_amt / non_tank_count if ch == "party" else eff_amt
+                    key = (eid, b_idx, ch)
+                    if ev_type == "heal":
+                        fight_sums[key] += norm_amt
+                        per_bin_wtime[key] += norm_amt * (rel_s - snap_t)
+                        per_bin_wsum[key] += norm_amt
+                    else:
+                        fight_shield_sums[key] += norm_amt
+                        per_bin_shield_wtime[key] += norm_amt * (rel_s - snap_t)
+                        per_bin_shield_wsum[key] += norm_amt
+                    break
+
+        for eid, _snap_t, _lo, _hi, bins in active_windows:
+            for b_idx in range(len(bins)):
+                for ch in ("party", "mt", "st"):
+                    key = (eid, b_idx, ch)
+                    per_bin_vals[key].append(fight_sums.get(key, 0.0))
+                    per_bin_shield_vals[key].append(fight_shield_sums.get(key, 0.0))
+
+    pulses: list[PartnerActionProb] = []
+    for (eid, b_idx, ch), vals in per_bin_vals.items():
+        if not vals:
+            continue
+        avg_h = mean(vals)
+        if avg_h < min_pulse_hp:
+            continue
+        wsum = per_bin_wsum.get((eid, b_idx, ch), 0.0)
+        offset_s = (per_bin_wtime[(eid, b_idx, ch)] / wsum) if wsum > 0.0 else 1.2
+        pulses.append(
+            PartnerActionProb(
+                event_id=eid,
+                skill_name=f"相方・PT実測回復#{b_idx + 1} ({ch})",
+                source_role="healer" if ch == "party" else "tank",
+                target_channel=ch,  # type: ignore[arg-type]
+                duration_s=0.0,
+                heal_value=round(avg_h, 1),
+                probability=1.0,
+                timing_mean_offset_s=round(offset_s, 2),
+                timing_std_s=0.5,
+                sample_count=len(vals),
+                non_tank_only=(ch == "party"),
+            )
+        )
+
+    for (eid, b_idx, ch), vals in per_bin_shield_vals.items():
+        if not vals:
+            continue
+        avg_sh = mean(vals)
+        if avg_sh < min_pulse_hp:
+            continue
+        wsum = per_bin_shield_wsum.get((eid, b_idx, ch), 0.0)
+        raw_offset = (per_bin_shield_wtime[(eid, b_idx, ch)] / wsum) if wsum > 0.0 else 0.0
+        ev_obj = ev_by_id.get(eid)
+        # Apply shield slightly BEFORE the observed absorption timestamp (or before event snapshot for bin 0)
+        if b_idx == 0:
+            sh_offset = min(-1.5, raw_offset - 1.5)
+            span_s = ((ev_obj.hit_count - 1) * ev_obj.hit_interval_s) if ev_obj is not None else 0.0
+            sh_dur = max(8.0, span_s + 5.0)
+        else:
+            sh_offset = raw_offset - 1.0
+            sh_dur = 8.0
+        pulses.append(
+            PartnerActionProb(
+                event_id=eid,
+                skill_name=f"相方・PT実測バリア#{b_idx + 1} ({ch})",
+                source_role="healer" if ch == "party" else "tank",
+                target_channel=ch,  # type: ignore[arg-type]
+                duration_s=round(sh_dur, 1),
+                shield_value=round(avg_sh, 1),
+                probability=1.0,
+                timing_mean_offset_s=round(sh_offset, 2),
+                timing_std_s=0.5,
+                sample_count=len(vals),
+                non_tank_only=(ch == "party"),
+            )
+        )
+    return pulses
+
+
+def extract_player_expert_actions(
+    kit_skills_by_action_id: dict[int, dict[str, Any]],
+    fight_start_ms: float,
+    casts: list[dict[str, Any]],
+    player_actor_id: int,
+    tank_slot_by_id: dict[int, str] | None = None,
+) -> list[dict[str, Any]]:
+    """Extract a real player's chronological defensive/healing cast schedule from FFLogs for BC / replay.
+
+    Uses `begincast` timestamps when available (or subtracts `cast_time_s`) so cast-time spells
+    such as Concitation are labeled at cast-start rather than cast-completion.
+    """
+    tank_map = tank_slot_by_id or {}
+    sorted_casts = sorted(casts, key=lambda x: float(x.get("timestamp", 0)))
+    # Track most recent begincast per abilityGameID for cast-time spells
+    last_begincast_ms: dict[int, float] = {}
+    actions: list[dict[str, Any]] = []
+    for ev in sorted_casts:
+        if int(ev.get("sourceID", -1)) != player_actor_id:
+            continue
+        ab_id = int(ev.get("abilityGameID", 0))
+        if ev.get("type") == "begincast":
+            if ab_id in kit_skills_by_action_id:
+                last_begincast_ms[ab_id] = float(ev["timestamp"])
+            continue
+        if ev.get("type") != "cast":
+            continue
+        if ab_id not in kit_skills_by_action_id:
+            continue
+        sk_info = kit_skills_by_action_id[ab_id]
+        ev_ms = float(ev["timestamp"])
+        cast_time_s = float(sk_info.get("cast_time_s", 0.0))
+        if cast_time_s > 0.0:
+            bg_ms = last_begincast_ms.pop(ab_id, None)
+            if bg_ms is not None and 0.0 <= (ev_ms - bg_ms) <= (cast_time_s + 1.5) * 1000.0:
+                start_ms = bg_ms
+            else:
+                start_ms = ev_ms - cast_time_s * 1000.0
+        else:
+            start_ms = ev_ms
+        rel_s = max(0.0, round((start_ms - fight_start_ms) / 1000.0, 2))
+        tgt_id = int(ev.get("targetID", -1))
+        t_ch = sk_info.get("default_channel") or sk_info.get("target_scope", "party")
+        if sk_info.get("target_scope") == "single_ally":
+            t_ch = tank_map.get(tgt_id, "mt")
+        actions.append(
+            {
+                "cast_at_s": rel_s,
+                "skill_id": sk_info.get("skill_id") or sk_info["id"],
+                "skill_name": sk_info.get("skill_name") or sk_info.get("name", ""),
+                "target_channel": t_ch,
+                "is_gcd": bool(sk_info.get("is_gcd", False)),
+            }
+        )
+    return actions
 
 
 def extract_weave_windows(

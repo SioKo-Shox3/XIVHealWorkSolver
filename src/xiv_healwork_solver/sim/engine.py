@@ -68,6 +68,9 @@ class _ActiveBuff:
     mit_mag: float = 0.0
     hot_per_tick: float = 0.0
     mp_per_tick: float = 0.0
+    delayed_heal: float = 0.0
+    delayed_trigger_ratio: float = 0.5
+    delayed_triggered: bool = False
 
 
 @dataclass
@@ -149,6 +152,7 @@ class CombatEngine:
         raise_prob_per_pull: float = 0.0,
         partner_trust_scale: float = 1.0,
         tank_passive_self_heal_per_tick: float = 0.0,
+        forced_damage_roll: float | None = None,
         seed: int | None = None,
     ) -> None:
         self.kit = kit
@@ -157,6 +161,7 @@ class CombatEngine:
         self.raise_prob_per_pull = raise_prob_per_pull
         self.partner_trust_scale = partner_trust_scale
         self.tank_passive_self_heal_per_tick = tank_passive_self_heal_per_tick
+        self.forced_damage_roll = forced_damage_roll
         self.rng = np.random.default_rng(seed)
 
         self.events = sorted(timeline.events, key=lambda e: e.time_s)
@@ -285,11 +290,16 @@ class CombatEngine:
                         self.skill_charges[sk.id] -= 1
                         if was_full:
                             self.skill_next_charge_at[sk.id] = ready_t
-                sh_amt = (
-                    pp.override_shield_value
-                    if pp.override_shield_value is not None
-                    else sk.shield_value * self.heal_scale
-                )
+                if pp.consumes_mp and "mp" in self.resources:
+                    mp_cost = sk.resource_costs.get("mp", 0.0)
+                    if mp_cost > 0:
+                        self.resources["mp"] = max(0.0, self.resources["mp"] - mp_cost)
+                if pp.override_shield_value is not None:
+                    sh_amt = pp.override_shield_value
+                elif sk.shield_max_hp_ratio > 0:
+                    sh_amt = self.max_hp[pp.target_channel] * sk.shield_max_hp_ratio
+                else:
+                    sh_amt = sk.shield_value * self.heal_scale
                 sh_exp = pp.offset_s + sk.effective_shield_duration()
                 if sh_amt > 0 and sh_exp > EPS:
                     self._add_shield(pp.target_channel, sh_amt, sh_exp, sk.id, sk.shield_stack_group)
@@ -347,6 +357,12 @@ class CombatEngine:
         # Schedule initial 3s server tick
         self._push(self.next_server_tick, PRIO_SERVER_TICK, "server_tick", None)
 
+        # Schedule player weapon auto-attacks for AA-driven job gauges (e.g. Paladin Oath Gauge; pauses in downtime!)
+        if any(p.gain_per_player_aa > 0.0 for p in self.resolved_pools.values()):
+            p_aa_t = start_time_s + self.kit.player_aa_interval_s
+            if p_aa_t <= self.timeline.duration_s + EPS:
+                self._push(p_aa_t, PRIO_SERVER_TICK, "player_aa", None)
+
         # Schedule downtime debuff-clear transitions
         for dw in self.timeline.downtime_windows:
             if dw.start_s >= start_time_s - EPS and dw.clears_boss_debuffs:
@@ -385,13 +401,29 @@ class CombatEngine:
             if ev is None or ev.time_s < start_time_s - EPS:
                 continue
             p = min(1.0, pa.probability * self.partner_trust_scale)
-            fires = (p >= 0.5) if deterministic else (float(self.rng.random()) < p)
-            if not fires:
+            if p <= EPS:
                 continue
-            jitter = 0.0 if deterministic else float(self.rng.normal(0.0, pa.timing_std_s))
+            if deterministic:
+                # Expected-value scaling in deterministic mode matches stochastic expectation E[X] = p * X
+                # without losing cross-comp p=0.33 mitigations/shields to a hard 0.5 cliff.
+                pa_eff = pa if p >= 1.0 - EPS else pa.model_copy(
+                    update={
+                        "mitigation_all": pa.mitigation_all * p,
+                        "mitigation_physical": pa.mitigation_physical * p,
+                        "mitigation_magical": pa.mitigation_magical * p,
+                        "shield_value": pa.shield_value * p,
+                        "heal_value": pa.heal_value * p,
+                    }
+                )
+                jitter = 0.0
+            else:
+                if float(self.rng.random()) >= p:
+                    continue
+                pa_eff = pa
+                jitter = float(self.rng.normal(0.0, pa.timing_std_s))
             # Align partner timing offset with event snapshot time (matching extractor.py)
             fire_t = max(start_time_s, ev.effective_snapshot_time() + pa.timing_mean_offset_s + jitter)
-            self._push(fire_t, PRIO_PARTNER, "partner", pa)
+            self._push(fire_t, PRIO_PARTNER, "partner", pa_eff)
 
         # Optional stochastic mid-fight Raise disturbance
         if (
@@ -418,16 +450,28 @@ class CombatEngine:
                 else:
                     self.skill_next_charge_at[sk.id] = math.inf
 
-        # Update non-MP continuous time-based resources (e.g. Addersgall / Lily 1 per 20s)
+        # Update continuous time-based resources (Addersgall/Lily, plus Tank job MP regen from combos/CDs)
         for rname, pool in self.resolved_pools.items():
-            if rname.lower() == "mp":
+            if rname.lower() == "mp" and self.kit.role != "tank":
                 continue
             if pool.regen_per_sec > 0.0:
                 self.resources[rname] = min(pool.maximum, self.resources.get(rname, 0.0) + pool.regen_per_sec * dt)
 
-        # Prune expired buffs, shields, and DoTs
+        # Prune expired buffs, shields, and DoTs (fire any untriggered delayed/reactive heals on expiry!)
         self.t = new_t
-        self.active_buffs = [b for b in self.active_buffs if b.expires_at >= self.t - EPS]
+        kept_buffs: list[_ActiveBuff] = []
+        for b in self.active_buffs:
+            if b.expires_at >= self.t - EPS:
+                kept_buffs.append(b)
+            elif b.delayed_heal > 0.0 and not b.delayed_triggered and not self.died:
+                b.delayed_triggered = True
+                self._apply_heal(
+                    b.target_channel,
+                    b.delayed_heal,
+                    is_player_heal=(not b.skill_id.startswith("partner_")),
+                    single_channel_only=(b.target_channel != "party"),
+                )
+        self.active_buffs = kept_buffs
         self.active_dots = [d for d in self.active_dots if d.ticks_remaining > 0 and d.expires_at >= self.t - EPS]
         for ch in ("party", "mt", "st"):
             self.shields[ch] = [sh for sh in self.shields[ch] if sh.expires_at >= self.t - EPS and sh.remaining > EPS]
@@ -442,10 +486,11 @@ class CombatEngine:
         duration_s: float,
         source_id: str,
         stack_group: str | None,
+        single_channel_only: bool = False,
     ) -> None:
         if amount <= 0.0:
             return
-        targets = ("party", "mt", "st") if channel == "party" else (channel,)
+        targets = (channel,) if single_channel_only else (("party", "mt", "st") if channel == "party" else (channel,))
         exp = self.t + max(3.0, duration_s)
         for ch in targets:
             if stack_group is not None:
@@ -461,10 +506,16 @@ class CombatEngine:
             else:
                 self.shields[ch].append(_ActiveShield(source_id, None, amount, exp))
 
-    def _apply_heal(self, channel: str, amount: float, is_player_heal: bool = False) -> float:
+    def _apply_heal(
+        self,
+        channel: str,
+        amount: float,
+        is_player_heal: bool = False,
+        single_channel_only: bool = False,
+    ) -> float:
         if amount <= 0.0:
             return 0.0
-        targets = ("party", "mt", "st") if channel == "party" else (channel,)
+        targets = (channel,) if single_channel_only else (("party", "mt", "st") if channel == "party" else (channel,))
         eff = 0.0
         raw_total = amount * len(targets)
         for ch in targets:
@@ -519,20 +570,25 @@ class CombatEngine:
             if (channel == "mt" and self.kit.player_is_mt) or (channel == "st" and not self.kit.player_is_mt):
                 rem *= 1.0 - self.tenacity_mit
 
-        used_groups: set[str] = set()
+        group_best_factor: dict[str, float] = {}
         for b in self.active_buffs:
             if b.expires_at < self.t - EPS:
                 continue
             if not (b.target_channel in ("party", "boss") or b.target_channel == channel):
                 continue
-            if b.stack_group:
-                if b.stack_group in used_groups:
-                    continue
-                used_groups.add(b.stack_group)
             m_all = b.mit_all
             m_phys = b.mit_phys if damage_type == "physical" else 0.0
             m_mag = b.mit_mag if damage_type == "magical" else 0.0
-            rem *= (1.0 - m_all) * (1.0 - m_phys) * (1.0 - m_mag)
+            factor = (1.0 - m_all) * (1.0 - m_phys) * (1.0 - m_mag)
+            if b.stack_group:
+                # Always keep the strongest active buff within each stack_group (e.g. player's 10% Reprisal > 5% expected partner Reprisal)
+                prev = group_best_factor.get(b.stack_group, 1.0)
+                if factor < prev:
+                    group_best_factor[b.stack_group] = factor
+            else:
+                rem *= factor
+        for f in group_best_factor.values():
+            rem *= f
         return rem
 
     def _apply_damage_to_channel(
@@ -542,7 +598,12 @@ class CombatEngine:
         damage_type: str,
         forced_mit_factor: float | None = None,
     ) -> bool:
-        roll = 1.0 if self.deterministic else float(self.rng.uniform(1.0 - self.damage_variance, 1.0 + self.damage_variance))
+        if self.forced_damage_roll is not None:
+            roll = self.forced_damage_roll
+        elif self.deterministic:
+            roll = 1.0
+        else:
+            roll = float(self.rng.uniform(1.0 - self.damage_variance, 1.0 + self.damage_variance))
         mit_factor = self.compute_mitigation_factor(channel, damage_type) if forced_mit_factor is None else forced_mit_factor
         dmg = raw_dmg * roll * mit_factor
 
@@ -573,6 +634,22 @@ class CombatEngine:
                 self.stats["survived"] = 0.0
             self.max_deficit_hp = max(self.max_deficit_hp, deficit)
             return True
+        # Trigger any active reactive/delayed heal (e.g. Excogitation / Shadowed Vigil) if HP fell below threshold!
+        for b in self.active_buffs:
+            if (
+                b.delayed_heal > 0.0
+                and not b.delayed_triggered
+                and b.expires_at >= self.t - EPS
+                and (b.target_channel == channel or b.target_channel == "party")
+                and (self.hp[channel] / self.max_hp[channel]) < b.delayed_trigger_ratio
+            ):
+                b.delayed_triggered = True
+                self._apply_heal(
+                    channel,
+                    b.delayed_heal,
+                    is_player_heal=(not b.skill_id.startswith("partner_")),
+                    single_channel_only=True,
+                )
         return False
 
     def _process_item(self, item: _ScheduledItem) -> None:
@@ -601,9 +678,20 @@ class CombatEngine:
                     )
                 )
             if pa.shield_value > 0:
-                self._add_shield(pa.target_channel, pa.shield_value, max(15.0, dur), f"partner_{pa.skill_name}", pa.shield_stack_group)
+                self._add_shield(
+                    pa.target_channel,
+                    pa.shield_value,
+                    max(15.0, dur),
+                    f"partner_{pa.skill_name}",
+                    pa.shield_stack_group,
+                    single_channel_only=pa.non_tank_only,
+                )
             if pa.heal_value > 0:
-                self._apply_heal(pa.target_channel, pa.heal_value)
+                self._apply_heal(
+                    pa.target_channel,
+                    pa.heal_value,
+                    single_channel_only=pa.non_tank_only,
+                )
 
         elif item.kind == "snapshot":
             ev: DamageEvent = item.payload
@@ -705,6 +793,19 @@ class CombatEngine:
                     )
                 )
 
+        elif item.kind == "player_aa":
+            # Player weapon auto-attack against targetable boss (generates Paladin Oath Gauge etc.; pauses in downtime!)
+            if self.timeline.is_boss_targetable(self.t) and self.timeline.can_party_act(self.t):
+                for rname, pool in self.resolved_pools.items():
+                    if pool.gain_per_player_aa > 0.0:
+                        self.resources[rname] = min(
+                            pool.maximum,
+                            self.resources.get(rname, 0.0) + pool.gain_per_player_aa,
+                        )
+            nxt_paa = self.t + self.kit.player_aa_interval_s
+            if nxt_paa <= self.timeline.duration_s + EPS:
+                self._push(nxt_paa, PRIO_SERVER_TICK, "player_aa", None)
+
         elif item.kind == "auto_attack":
             seg = item.payload
             if self.timeline.is_boss_targetable(self.t):
@@ -724,6 +825,16 @@ class CombatEngine:
                     oh = self._apply_heal(b.target_channel, b.hot_per_tick, is_player_heal=(not b.skill_id.startswith("partner_")))
                     if not b.skill_id.startswith("partner_"):
                         self._step_reward_accum -= oh * 0.02
+            # Automatic single-target pet/fairy heal (e.g. Eos Embrace) onto ONLY the single lowest-HP-ratio channel
+            if self.kit.pet_auto_heal_per_3s_tick > 0:
+                lowest_ch = min(("mt", "st", "party"), key=lambda c: self.hp[c] / self.max_hp[c])
+                if self.hp[lowest_ch] < self.max_hp[lowest_ch] - 1.0:
+                    self._apply_heal(
+                        lowest_ch,
+                        self.kit.pet_auto_heal_per_3s_tick * self.heal_scale,
+                        is_player_heal=True,
+                        single_channel_only=True,
+                    )
             # Partner baseline healing (co-healer GCD/short-CD healing & tank self-sustain from FFLogs)
             pbh = self.timeline.partner_baseline_healing
             if self.partner_trust_scale > 0:
@@ -824,12 +935,14 @@ class CombatEngine:
     def _apply_skill_effects(self, sk: SkillDef, channel: str) -> None:
         hot_ticks = max(1, int(round(sk.duration_s / 3.0))) if sk.duration_s >= 3.0 else 1
         hot_per_tick = (sk.heal_hot_total * self.heal_scale) / hot_ticks if sk.heal_hot_total > 0 else 0.0
+        delayed_heal = sk.delayed_heal_value * self.heal_scale if sk.delayed_heal_value > 0 else 0.0
         if sk.duration_s > 0 and (
             sk.mitigation_all > 0
             or sk.mitigation_physical > 0
             or sk.mitigation_magical > 0
             or hot_per_tick > 0
             or sk.mp_regen_per_tick > 0
+            or delayed_heal > 0
         ):
             self.active_buffs.append(
                 _ActiveBuff(
@@ -842,9 +955,23 @@ class CombatEngine:
                     mit_mag=sk.mitigation_magical,
                     hot_per_tick=hot_per_tick,
                     mp_per_tick=sk.mp_regen_per_tick,
+                    delayed_heal=delayed_heal,
+                    delayed_trigger_ratio=sk.delayed_heal_trigger_ratio,
                 )
             )
-        if sk.shield_value > 0:
+        if sk.shield_max_hp_ratio > 0:
+            # % Max HP shields (e.g. TBN = 25% Max HP) scale with target Max HP, NOT heal_scale!
+            targets = ("party", "mt", "st") if channel == "party" else (channel,)
+            for ch in targets:
+                self._add_shield(
+                    ch,
+                    self.max_hp[ch] * sk.shield_max_hp_ratio,
+                    sk.effective_shield_duration(),
+                    sk.id,
+                    sk.shield_stack_group,
+                    single_channel_only=True,
+                )
+        elif sk.shield_value > 0:
             self._add_shield(
                 channel,
                 sk.shield_value * self.heal_scale,
@@ -1047,6 +1174,7 @@ def replay_plan(
     initial_hp_ratios: dict[str, float] | None = None,
     initial_resources: dict[str, float] | None = None,
     initial_cooldowns: dict[str, float] | None = None,
+    forced_damage_roll: float | None = None,
 ) -> ReplayVerification:
     """Replay a planned action schedule chronologically through the exact CombatEngine."""
     engine = CombatEngine(
@@ -1056,6 +1184,7 @@ def replay_plan(
         raise_prob_per_pull=0.0,
         partner_trust_scale=plan.partner_trust,
         tank_passive_self_heal_per_tick=0.0,
+        forced_damage_roll=forced_damage_roll,
     )
     engine.reset(
         deterministic=deterministic,

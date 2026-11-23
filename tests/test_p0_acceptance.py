@@ -1,8 +1,15 @@
 """P0 Acceptance Tests: exact parity between CP-SAT replay, CombatEngine, RL env, and FFLogs curator."""
 from __future__ import annotations
 
+import pytest
+
 from xiv_healwork_solver.fflogs.curator import curate_fight_candidates
-from xiv_healwork_solver.fflogs.extractor import extract_damage_timeline, extract_partner_probabilities
+from xiv_healwork_solver.fflogs.extractor import (
+    extract_damage_timeline,
+    extract_partner_healing_pulses,
+    extract_partner_probabilities,
+    extract_player_expert_actions,
+)
 from xiv_healwork_solver.models import (
     AutoAttackSegment,
     DamageEvent,
@@ -11,6 +18,7 @@ from xiv_healwork_solver.models import (
     GearSamplingRange,
     GearStats,
     LogFilterConfig,
+    PartnerActionProb,
     PlayerKit,
     PrePullAction,
     ResourcePool,
@@ -578,7 +586,7 @@ def test_prepull_critlo_deploy_and_gear_conditioned_sampling():
     for _ in range(5):
         obs = env.reset(deterministic=False)
         seen_gcds.add(env.kit.gcd_s)
-        assert obs["state"].shape == (32,)
+        assert obs["state"].shape == (33,)
     assert len(seen_gcds) >= 3
 
     # Overheal efficiency scoring: lower overheal ranks strictly higher
@@ -611,5 +619,349 @@ def test_prepull_critlo_deploy_and_gear_conditioned_sampling():
     )
     assert [r.report_code for r in acc] == ["CLEAN_OH", "WASTEFUL_OH"]
     assert acc[0].quality_score > acc[1].quality_score
+
+
+def test_pet_auto_heal_targets_lowest_hp_channel_on_3s_tick():
+    """Fairy/pet passive 3s heal heals the lowest HP-ratio channel (e.g. MT taking AAs)."""
+    kit = PlayerKit(
+        label="Fairy SCH",
+        role="healer",
+        max_hp_party=180_000,
+        max_hp_tank=280_000,
+        pet_auto_heal_per_3s_tick=12_000.0,
+        skills=[],
+    )
+    tl = EncounterTimeline(
+        encounter_name="MT AA Pet Heal",
+        duration_s=12.0,
+        events=[],
+        auto_attacks=[
+            AutoAttackSegment(start_s=2.0, end_s=2.0, interval_s=3.0, target="mt", raw_damage_per_hit=50_000.0)
+        ],
+    )
+    eng = CombatEngine(kit=kit, timeline=tl, damage_variance=0.0, raise_prob_per_pull=0.0)
+    eng.reset(deterministic=True, fixed_tick_phase=0.5)
+    eng.advance_to(11.0)
+    # After 2.0s AA (-50k -> 230k), 3s ticks at 3.5s, 6.5s, 9.5s heal MT by 3 * 12k = +36k -> 266k
+    assert eng.hp["mt"] == pytest.approx(266_000.0, abs=10.0)
+    assert eng.hp["party"] == pytest.approx(180_000.0, abs=1.0)
+
+
+def test_fflogs_calibration_fixes_limitbreak_combined_dots_disjoint_waves_and_absorbed_shields():
+    """Regression test for real-log calibration fixes:
+    1) Disjoint-target split waves & simultaneous disjoint abilities do not double-hit `party`.
+    2) Synthetic `Combined DoTs` (ID 500000) and 1-person avoidable clips are ignored in 8-man logs.
+    3) `LimitBreak` pseudo-actors are excluded from `non_tank_count`.
+    4) `extract_partner_healing_pulses` extracts both empirical heals (split per multi-hit) and absorbed shields.
+    5) `extract_player_expert_actions` maps real player casts cleanly to kit skill IDs.
+    """
+    actors = {
+        1: {"id": 1, "name": "MT", "type": "Player", "subType": "DarkKnight"},
+        2: {"id": 2, "name": "ST", "type": "Player", "subType": "Paladin"},
+        3: {"id": 3, "name": "H1", "type": "Player", "subType": "WhiteMage"},
+        4: {"id": 4, "name": "H2", "type": "Player", "subType": "Scholar"},
+        5: {"id": 5, "name": "D1", "type": "Player", "subType": "Dragoon"},
+        6: {"id": 6, "name": "D2", "type": "Player", "subType": "Samurai"},
+        7: {"id": 7, "name": "D3", "type": "Player", "subType": "Bard"},
+        8: {"id": 8, "name": "D4", "type": "Player", "subType": "BlackMage"},
+        99: {"id": 99, "name": "Limit Break", "type": "Player", "subType": "LimitBreak"},
+    }
+    abilities = {
+        100: {"gameID": 100, "name": "Blast Beat", "type": 1024},
+        101: {"gameID": 101, "name": "Ultrasonic Spread", "type": 1024},
+        102: {"gameID": 102, "name": "Blood Lash", "type": 1024},
+        103: {"gameID": 103, "name": "Half Moon", "type": 1024},
+        500000: {"gameID": 500000, "name": "Combined DoTs", "type": 1024},
+        9001: {"gameID": 9001, "name": "Real Bleed", "type": 1024},
+    }
+    dmg_events = [
+        # Disjoint 4+4 wave Blast Beat (2.5s apart, disjoint targets -> 1 single hit, NOT 2x damage!)
+        *[{"type": "damage", "timestamp": 110_000, "abilityGameID": 100, "targetID": tid, "unmitigatedAmount": 90_000, "amount": 70_000} for tid in (3, 4, 5, 6)],
+        *[{"type": "damage", "timestamp": 112_500, "abilityGameID": 100, "targetID": tid, "unmitigatedAmount": 90_000, "amount": 70_000} for tid in (1, 2, 7, 8)],
+        # Simultaneous disjoint split abilities (Spread on 3,4,5 + Lash on 6,7,8 within 0.7s -> merged max raw!)
+        *[{"type": "damage", "timestamp": 130_000, "abilityGameID": 101, "targetID": tid, "unmitigatedAmount": 110_000, "amount": 80_000} for tid in (3, 4, 5)],
+        *[{"type": "damage", "timestamp": 130_700, "abilityGameID": 102, "targetID": tid, "unmitigatedAmount": 120_000, "amount": 90_000} for tid in (6, 7, 8)],
+        # 1-person avoidable Half Moon clip on D1 -> ignored in 8-man log
+        {"type": "damage", "timestamp": 140_000, "abilityGameID": 103, "targetID": 5, "unmitigatedAmount": 130_000, "amount": 100_000},
+        # Synthetic Combined DoTs (500000) -> ignored; Real Bleed on 4 non-tanks -> kept!
+        *[{"type": "damage", "tick": True, "timestamp": 153_000, "abilityGameID": 500000, "targetID": tid, "unmitigatedAmount": 30_000, "amount": 30_000} for tid in (3, 4, 5, 6)],
+        *[{"type": "damage", "tick": True, "timestamp": 153_000, "abilityGameID": 9001, "targetID": tid, "unmitigatedAmount": 30_000, "amount": 30_000} for tid in (3, 4, 5, 6)],
+    ]
+    tl = extract_damage_timeline(
+        encounter_name="Calibration Test",
+        zone_name="Test",
+        fight_start_ms=100_000.0,
+        fight_end_ms=170_000.0,
+        damage_events=dmg_events,
+        actors_by_id=actors,
+        abilities_by_id=abilities,
+        min_raw_damage=35_000.0,
+    )
+    names = [e.name for e in tl.events]
+    assert len(tl.events) == 3  # Blast Beat, Spread/Lash merged, Real Bleed (no Half Moon, no Combined DoTs!)
+    assert tl.events[0].hit_count == 1 and tl.events[0].raw_damage == pytest.approx(90_000.0)
+    assert tl.events[1].raw_damage == pytest.approx(120_000.0)
+    assert all("Half Moon" not in n and "Combined DoTs" not in n for n in names)
+
+    # Empirical healing + absorbed shields divide by 6 real non-tanks (NOT 7 with LimitBreak!)
+    heals = [
+        *[{"type": "absorbed", "timestamp": 110_000, "sourceID": 4, "targetID": tid, "amount": 30_000} for tid in (3, 4, 5, 6, 7, 8)],
+        *[{"type": "heal", "timestamp": 112_000, "sourceID": 3, "targetID": tid, "amount": 42_000} for tid in (3, 4, 5, 6, 7, 8)],
+    ]
+    pulses = extract_partner_healing_pulses(
+        timeline=tl,
+        fights_heal_streams=[
+            {
+                "fight_start_ms": 100_000.0,
+                "fight_end_ms": 170_000.0,
+                "heals": heals,
+                "actors_by_id": actors,
+                "tank_slot_by_id": {1: "mt", 2: "st"},
+            }
+        ],
+        exclude_actor_names={"MT"},
+    )
+    party_heals = [p for p in pulses if p.target_channel == "party" and p.heal_value > 0]
+    party_shields = [p for p in pulses if p.target_channel == "party" and p.shield_value > 0]
+    assert len(party_heals) == 1 and party_heals[0].heal_value == pytest.approx(42_000.0)
+    assert len(party_shields) == 1 and party_shields[0].shield_value == pytest.approx(30_000.0)
+    assert party_shields[0].timing_mean_offset_s < 0.0
+
+    # Expert cast extraction
+    casts = [
+        {"type": "cast", "timestamp": 108_500, "sourceID": 4, "abilityGameID": 188, "targetID": 4},
+        {"type": "cast", "timestamp": 115_000, "sourceID": 3, "abilityGameID": 188, "targetID": 3},  # different player -> ignored
+    ]
+    extracted = extract_player_expert_actions(
+        kit_skills_by_action_id={
+            188: {"id": "sacred_soil", "name": "野戦治療の陣", "default_channel": "party", "is_gcd": False}
+        },
+        fight_start_ms=100_000.0,
+        casts=casts,
+        player_actor_id=4,
+    )
+    assert len(extracted) == 1
+    assert extracted[0]["skill_id"] == "sacred_soil"
+    assert extracted[0]["cast_at_s"] == pytest.approx(8.5)
+
+
+def test_codex_pretrain_regression_no_combined_hots_no_tank_double_heal_strongest_stack_group_and_reactive_heal():
+    """Verify every high-impact bug caught by Codex pre-training review:
+    1) Combined HoTs (500001) and Scholar's own Eos pet are excluded from partner healing.
+    2) `non_tank_only=True` party pulse does NOT duplicate onto MT/ST.
+    3) Player's 10% Reprisal overrides a 5% expected-value partner Reprisal in the same stack_group.
+    4) TBN 25% max HP shield scales with tank max_hp (not heal_scale) and Shadowed Vigil delayed heal triggers <50% HP.
+    """
+    actors = {
+        1: {"id": 1, "name": "MT", "type": "Player", "subType": "DarkKnight"},
+        2: {"id": 2, "name": "ST", "type": "Player", "subType": "Paladin"},
+        3: {"id": 3, "name": "H1", "type": "Player", "subType": "WhiteMage"},
+        4: {"id": 4, "name": "H2", "type": "Player", "subType": "Scholar"},
+        5: {"id": 5, "name": "D1", "type": "Player", "subType": "Dragoon"},
+        6: {"id": 6, "name": "D2", "type": "Player", "subType": "Samurai"},
+        7: {"id": 7, "name": "D3", "type": "Player", "subType": "Bard"},
+        8: {"id": 8, "name": "D4", "type": "Player", "subType": "BlackMage"},
+    }
+    all_actors = {**actors, 177: {"id": 177, "name": "Eos", "type": "Pet", "subType": "Pet"}}
+    tl = EncounterTimeline(
+        encounter_name="Codex Pretrain Audit",
+        duration_s=30.0,
+        events=[DamageEvent(id="e1", time_s=10.0, name="Raidwide", raw_damage=100_000)],
+    )
+    heals = [
+        {"type": "heal", "timestamp": 111_000, "sourceID": 3, "targetID": 5, "abilityGameID": 3571, "amount": 60_000, "packetID": 1},
+        # Synthetic Combined HoTs (500001) -> MUST be skipped
+        {"type": "heal", "timestamp": 111_000, "sourceID": 3, "targetID": 5, "abilityGameID": 500001, "amount": 60_000, "packetID": 2},
+        # Scholar's own Eos pet -> MUST be excluded when exclude_pet_names={"eos"}
+        {"type": "heal", "timestamp": 111_000, "sourceID": 177, "targetID": 1, "abilityGameID": 802, "amount": 15_000, "packetID": 3},
+        # Unpaired positive calculatedheal on ST -> MUST be preserved
+        {"type": "calculatedheal", "timestamp": 112_000, "sourceID": 2, "targetID": 2, "abilityGameID": 3542, "amount": 25_000, "packetID": 99},
+    ]
+    pulses = extract_partner_healing_pulses(
+        timeline=tl,
+        fights_heal_streams=[
+            {
+                "fight_start_ms": 100_000.0,
+                "fight_end_ms": 130_000.0,
+                "heals": heals,
+                "actors_by_id": actors,
+                "all_actors_by_id": all_actors,
+                "tank_slot_by_id": {1: "mt", 2: "st"},
+            }
+        ],
+        exclude_actor_names={"H2"},
+        exclude_pet_names={"eos"},
+    )
+    party_p = [p for p in pulses if p.target_channel == "party"]
+    mt_p = [p for p in pulses if p.target_channel == "mt"]
+    st_p = [p for p in pulses if p.target_channel == "st"]
+    assert len(party_p) == 1 and party_p[0].heal_value == pytest.approx(10_000.0) and party_p[0].non_tank_only is True
+    assert len(mt_p) == 0  # Eos excluded!
+    assert len(st_p) == 1 and st_p[0].heal_value == pytest.approx(25_000.0)  # Unpaired calculatedheal preserved!
+
+    # Engine: strongest stack_group wins (player 10% Reprisal > partner 5% Reprisal) + TBN %MaxHP + Shadowed Vigil reactive heal
+    tank_kit = PlayerKit(
+        label="DRK Audit",
+        role="tank",
+        max_hp_party=180_000,
+        max_hp_tank=280_000,
+        burst_weave_slots_per_gcd=2,
+        skills=[
+            SkillDef(
+                id="reprisal",
+                name="リプライザル",
+                cooldown_s=60.0,
+                duration_s=15.0,
+                target_scope="boss_debuff",
+                requires_targetable_boss=True,
+                mitigation_all=0.10,
+                stack_group="reprisal",
+            ),
+            SkillDef(
+                id="tbn",
+                name="ブラックナイト",
+                cooldown_s=15.0,
+                duration_s=7.0,
+                target_scope="single_ally",
+                shield_max_hp_ratio=0.25,
+            ),
+            SkillDef(
+                id="vigil",
+                name="シャドウヴィジル",
+                cooldown_s=120.0,
+                duration_s=15.0,
+                target_scope="self",
+                mitigation_all=0.40,
+                delayed_heal_value=55_000.0,
+                delayed_heal_trigger_ratio=0.50,
+            ),
+        ],
+    )
+    tl2 = EncounterTimeline(
+        encounter_name="Tank Stack & Vigil Test",
+        duration_s=20.0,
+        events=[DamageEvent(id="tb", time_s=10.0, name="Huge Buster", target_scope="mt", raw_damage=400_000)],
+        partner_profile=[
+            PartnerActionProb(
+                event_id="tb",
+                skill_name="Partner Reprisal",
+                target_channel="boss",
+                stack_group="reprisal",
+                duration_s=15.0,
+                mitigation_all=0.10,
+                probability=0.5,
+                timing_mean_offset_s=-5.0,
+            ),
+            PartnerActionProb(
+                event_id="tb",
+                skill_name="NonTank Heal Only",
+                target_channel="party",
+                duration_s=0.0,
+                heal_value=50_000.0,
+                probability=1.0,
+                timing_mean_offset_s=1.0,
+                non_tank_only=True,
+            ),
+        ],
+    )
+    eng = CombatEngine(kit=tank_kit, timeline=tl2, damage_variance=0.0, raise_prob_per_pull=0.0)
+    eng.reset(deterministic=True, fixed_tick_phase=1.5)
+    eng.advance_to(6.0)
+    # Partner 5% expected Reprisal landed at t=5.0; now player weaves 10% Reprisal, Vigil, and TBN (MT) across GCDs
+    idx_rep = next(a.index for a in eng.actions if a.skill and a.skill.id == "reprisal")
+    idx_tbn = next(a.index for a in eng.actions if a.skill and a.skill.id == "tbn" and a.target_channel == "mt")
+    idx_vig = next(a.index for a in eng.actions if a.skill and a.skill.id == "vigil")
+    eng.execute_action(1)  # Filler GCD refreshes weave slots
+    eng.advance_to(6.7)
+    eng.execute_action(idx_rep)
+    eng.advance_to(7.5)
+    eng.execute_action(idx_vig)
+    eng.advance_to(8.6)
+    eng.execute_action(1)  # Next GCD refreshes weave slots
+    eng.advance_to(9.3)
+    eng.execute_action(idx_tbn)
+    # TBN shield must be exact 25% of 280k = 70,000!
+    assert eng.total_shield("mt") == pytest.approx(70_000.0)
+    # Mitigation on MT must use player's 10% Reprisal (0.9) * Vigil (0.6) = 0.54 (NOT partner's 0.95 * 0.6 = 0.57!)
+    assert eng.compute_mitigation_factor("mt", "magical") == pytest.approx(0.90 * 0.60, rel=1e-3)
+    # After 400k buster: dmg = 400k * 0.54 = 216k; minus 70k TBN = 146k -> HP drops to 134k (<50% of 280k = 140k!)
+    # Vigil reactive heal (+55k) immediately triggers -> 189k HP!
+    # And NonTank Heal Only (+50k at t=11s) must NOT heal MT!
+    eng.advance_to(12.0)
+    assert eng.hp["mt"] == pytest.approx(189_000.0, abs=100.0)
+
+
+def test_paladin_oath_gauge_builds_on_player_aa_and_pauses_during_downtime():
+    """Verify job-specific Tank AA gauge (Paladin Oath +5/AA) builds during boss uptime and pauses in downtime."""
+    pld = PlayerKit.from_yaml("data/kits/paladin_heavyweight.yaml")
+    tl = EncounterTimeline(
+        encounter_name="Oath AA Downtime Test",
+        duration_s=30.0,
+        events=[],
+        downtime_windows=[DowntimeWindow(start_s=10.0, end_s=20.0, name="Boss Untargetable")],
+    )
+    eng = CombatEngine(kit=pld, timeline=tl, damage_variance=0.0, raise_prob_per_pull=0.0)
+    eng.reset(deterministic=True, fixed_tick_phase=1.5)
+    # 0..10s at 2.24s AA interval -> 4 AAs (2.24, 4.48, 6.72, 8.96) = 20 Oath
+    eng.advance_to(10.0)
+    assert eng.resources["oath"] == pytest.approx(20.0)
+    # 10..20s boss untargetable -> 0 Oath gained during downtime!
+    eng.advance_to(20.0)
+    assert eng.resources["oath"] == pytest.approx(20.0)
+    # 20..30s boss returns -> Oath resumes building!
+    eng.advance_to(30.0)
+    assert eng.resources["oath"] >= 40.0
+
+
+def test_worst_case_105_stress_verifier_and_100pct_hardener():
+    """Verify that a plan failing under +5% worst-case damage roll is automatically hardened to 100.0% survival across 12 tick phases."""
+    from xiv_healwork_solver.models import OptimizationPlan
+    from xiv_healwork_solver.sim.safety import harden_plan_to_100pct, stress_test_plan
+
+    kit = PlayerKit(
+        label="Safety SCH",
+        role="healer",
+        max_hp_party=100_000,
+        max_hp_tank=180_000,
+        skills=[
+            SkillDef(
+                id="soil",
+                name="野戦治療の陣",
+                cooldown_s=30.0,
+                duration_s=15.0,
+                is_gcd=False,
+                weave_cost=1,
+                target_scope="party",
+                mitigation_all=0.10,
+                dps_cost=0.05,
+            ),
+        ],
+    )
+    tl = EncounterTimeline(
+        encounter_name="Worst-Case Roll Test",
+        duration_s=20.0,
+        # 98k survives at 1.00x roll (2k left), but WIPES at 1.05x worst-case roll (102.9k > 100k)!
+        events=[DamageEvent(id="e1", time_s=10.0, name="Tight Raidwide", raw_damage=98_000)],
+    )
+    empty = OptimizationPlan(
+        encounter_name=tl.encounter_name,
+        kit_label=kit.label,
+        preset="balanced",
+        status="test",
+        objective_value=0.0,
+        partner_trust=1.0,
+        actions=[],
+        evaluations=[],
+    )
+    before = stress_test_plan(kit, tl, empty, damage_roll=1.05, n_phases=12)
+    assert before.survival_rate_pct == 0.0
+
+    hardened, after, repairs = harden_plan_to_100pct(kit, tl, empty, damage_roll=1.05, n_phases=12)
+    assert after.survival_rate_pct == 100.0
+    assert repairs == 1
+    assert hardened.actions[0].skill_id == "soil"
+
+
+
 
 

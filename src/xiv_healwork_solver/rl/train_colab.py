@@ -21,6 +21,7 @@ import torch.nn as nn
 from xiv_healwork_solver.models import EncounterTimeline, GearSamplingRange, PlayerKit
 from xiv_healwork_solver.rl.env import FF14HealMitEnv
 from xiv_healwork_solver.rl.model import SkillAttentionActorCritic
+from xiv_healwork_solver.sim.safety import action_log_to_plan, harden_plan_to_100pct, stress_test_plan
 
 
 def _compute_gae(
@@ -127,19 +128,23 @@ def _collect_bc_dataset(
 
     scheduled = sorted(plan_actions, key=lambda a: (float(a["cast_at_s"]), 0 if a.get("is_gcd") else 1))
     states, skills, futures, masks, actions = [], [], [], [], []
+    best_fallback: tuple[float, list, list, list, list, list] | None = None
+    bc_survivals = 0
 
     for i in range(n_trajectories):
         phase = (3.0 * i) / max(1, n_trajectories)
         obs = env.reset(deterministic=(i == 0), fixed_tick_phase=phase)
         ptr = 0
         done = False
+        info: dict[str, Any] = {}
+        ep_st, ep_sk, ep_fu, ep_mk, ep_ac = [], [], [], [], []
         while not done:
             t = env.t
             mask = obs["mask"]
             chosen = 0
             while ptr < len(scheduled) and float(scheduled[ptr]["cast_at_s"]) < t - 1.5:
                 ptr += 1
-            if ptr < len(scheduled) and float(scheduled[ptr]["cast_at_s"]) <= t + 0.25:
+            if ptr < len(scheduled) and float(scheduled[ptr]["cast_at_s"]) <= t + 0.6:
                 act = scheduled[ptr]
                 aidx = idx_by_key.get((act["skill_id"], act.get("target_channel", "party")), idx_by_skill.get(act["skill_id"], 0))
                 if mask[aidx]:
@@ -154,13 +159,31 @@ def _collect_bc_dataset(
                 if not imminent_gcd:
                     chosen = 1
 
-            states.append(obs["state"])
-            skills.append(obs["skills"])
-            futures.append(obs["future"])
-            masks.append(mask)
-            actions.append(chosen)
-            obs, _, done, _ = env.step(chosen, deterministic=(i == 0))
+            ep_st.append(obs["state"])
+            ep_sk.append(obs["skills"])
+            ep_fu.append(obs["future"])
+            ep_mk.append(mask)
+            ep_ac.append(chosen)
+            obs, _, done, info = env.step(chosen, deterministic=(i == 0))
+        survived = info.get("stats", {}).get("survived", 0.0) > 0.5
+        if survived:
+            bc_survivals += 1
+            states.extend(ep_st)
+            skills.extend(ep_sk)
+            futures.extend(ep_fu)
+            masks.extend(ep_mk)
+            actions.extend(ep_ac)
+        elif best_fallback is None or env.t > best_fallback[0]:
+            best_fallback = (env.t, ep_st, ep_sk, ep_fu, ep_mk, ep_ac)
 
+    if bc_survivals == 0 and best_fallback is not None:
+        print(f"[BC Collect] WARNING: 0/{n_trajectories} survived; falling back to longest pull ({best_fallback[0]:.1f}s)")
+        _, states, skills, futures, masks, actions = best_fallback
+    else:
+        print(
+            f"[BC Collect] trajectories={n_trajectories} kept_surviving={bc_survivals}/{n_trajectories} "
+            f"total_steps={len(actions)}"
+        )
     return (
         np.asarray(states, dtype=np.float32),
         np.asarray(skills, dtype=np.float32),
@@ -170,25 +193,67 @@ def _collect_bc_dataset(
     )
 
 
+def _evaluate_multi_gear(
+    model: SkillAttentionActorCritic,
+    kit: PlayerKit,
+    timeline: EncounterTimeline,
+    device: torch.device,
+    gear_conditioned: bool,
+    n_eval_pulls: int = 12,
+) -> tuple[dict[str, Any], float]:
+    """Evaluate policy at base gear and (when gear-conditioned) stressed gear variants so checkpoint selection catches gear regressions."""
+    base_ev = evaluate_policy(model, kit, timeline, device, n_eval_pulls=n_eval_pulls)
+    if not gear_conditioned:
+        return base_ev, base_ev["survival_rate_pct"] * 10.0 + base_ev["mean_reward"]
+
+    # Two diverse gear variants: slow-GCD/lower-HP & fast-GCD/higher-PIE-or-TEN
+    v1 = kit.model_copy(deep=True)
+    v1.gcd_s = min(2.50, round(kit.gcd_s + 0.08, 2))
+    v1.max_hp_party = round(kit.max_hp_party * 0.94, 0)
+    v1.max_hp_tank = round(kit.max_hp_tank * 0.94, 0)
+    if kit.role == "healer":
+        v1.gear_stats.piety = max(440, kit.gear_stats.piety - 300)
+    else:
+        v1.gear_stats.tenacity = max(420, kit.gear_stats.tenacity - 600)
+
+    v2 = kit.model_copy(deep=True)
+    v2.gcd_s = max(2.30, round(kit.gcd_s - 0.08, 2))
+    v2.max_hp_party = round(kit.max_hp_party * 1.04, 0)
+    v2.max_hp_tank = round(kit.max_hp_tank * 1.04, 0)
+    if kit.role == "healer":
+        v2.gear_stats.piety = min(1800, kit.gear_stats.piety + 400)
+    else:
+        v2.gear_stats.tenacity = min(2200, kit.gear_stats.tenacity + 600)
+
+    ev1 = evaluate_policy(model, v1, timeline, device, n_eval_pulls=max(6, n_eval_pulls // 2))
+    ev2 = evaluate_policy(model, v2, timeline, device, n_eval_pulls=max(6, n_eval_pulls // 2))
+    multi_surv = (base_ev["survival_rate_pct"] + ev1["survival_rate_pct"] + ev2["survival_rate_pct"]) / 3.0
+    multi_ret = (base_ev["mean_reward"] + ev1["mean_reward"] + ev2["mean_reward"]) / 3.0
+    base_ev["multi_gear_survival_pct"] = round(multi_surv, 2)
+    return base_ev, multi_surv * 10.0 + multi_ret
+
+
 def train_masked_ppo(
     kit: PlayerKit,
     timeline: EncounterTimeline,
-    updates: int = 60,
+    updates: int = 40,
     episodes_per_update: int = 12,
-    lr: float = 3e-4,
+    lr: float = 1e-4,
     hidden_dim: int = 128,
     ppo_epochs: int = 4,
     minibatch_size: int = 256,
     clip_coef: float = 0.2,
-    ent_coef: float = 0.015,
+    ent_coef: float = 0.003,
     vf_coef: float = 0.5,
     gear_conditioned: bool = True,
     bc_plan_actions: list[dict[str, Any]] | None = None,
-    bc_epochs: int = 15,
+    bc_epochs: int = 30,
+    bc_skill_class_weight: float = 15.0,
+    bc_kl_coef: float = 0.15,
     seed: int = 42,
     out_dir: str | Path = "outputs/rl_run",
 ) -> dict[str, Any]:
-    """Train gear-conditioned SkillAttentionActorCritic with optional BC warm-start + Masked PPO."""
+    """Train gear-conditioned SkillAttentionActorCritic with class-weighted BC warm-start + KL-anchored Masked PPO."""
     torch.manual_seed(seed)
     np.random.seed(seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -200,22 +265,28 @@ def train_masked_ppo(
 
     env = FF14HealMitEnv(kit, timeline, gear_sampling=gear_range, seed=seed)
     model = SkillAttentionActorCritic(hidden_dim=hidden_dim).to(device)
+    bc_anchor_model: SkillAttentionActorCritic | None = None
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, eps=1e-5)
 
-    # Optional Behavior Cloning warm-start from CP-SAT / FFLogs expert trajectories
+    # Optional class-weighted Behavior Cloning warm-start from FFLogs / CP-SAT expert trajectories
     if bc_plan_actions and bc_epochs > 0:
         bc_st, bc_sk, bc_fu, bc_mk, bc_ac = _collect_bc_dataset(
-            kit, timeline, bc_plan_actions, gear_range, n_trajectories=10, seed=seed
+            kit, timeline, bc_plan_actions, gear_range, n_trajectories=12, seed=seed
         )
         t_st = torch.from_numpy(bc_st).to(device)
         t_sk = torch.from_numpy(bc_sk).to(device)
         t_fu = torch.from_numpy(bc_fu).to(device)
         t_mk = torch.from_numpy(bc_mk).to(device)
         t_ac = torch.from_numpy(bc_ac).to(device)
-        ce_loss = nn.CrossEntropyLoss()
+        # Upweight actual defensive/healing skill actions (indices >= 2) to overcome 95% WAIT/FILLER imbalance!
+        cls_weights = torch.ones(env.n_actions, dtype=torch.float32, device=device)
+        if env.n_actions > 2:
+            cls_weights[2:] = bc_skill_class_weight
+        ce_loss = nn.CrossEntropyLoss(weight=cls_weights)
         bc_opt = torch.optim.AdamW(model.parameters(), lr=1e-3)
         model.train()
         n_bc = len(bc_ac)
+        skill_samples = int((bc_ac >= 2).sum())
         bc_idxs = np.arange(n_bc)
         for ep in range(1, bc_epochs + 1):
             np.random.shuffle(bc_idxs)
@@ -232,7 +303,16 @@ def train_masked_ppo(
                 tot_loss += float(loss.item())
                 batches += 1
             if ep == 1 or ep == bc_epochs:
-                print(f"[BC Epoch {ep:2d}/{bc_epochs}] samples={n_bc} loss={tot_loss / max(1, batches):.4f}")
+                print(
+                    f"[BC Epoch {ep:2d}/{bc_epochs}] samples={n_bc} (skills={skill_samples}) "
+                    f"weighted_loss={tot_loss / max(1, batches):.4f}"
+                )
+        if bc_kl_coef > 0.0:
+            bc_anchor_model = SkillAttentionActorCritic(hidden_dim=hidden_dim).to(device)
+            bc_anchor_model.load_state_dict(model.state_dict())
+            bc_anchor_model.eval()
+            for p in bc_anchor_model.parameters():
+                p.requires_grad_(False)
 
     out_path = Path(out_dir)
     out_path.mkdir(parents=True, exist_ok=True)
@@ -240,6 +320,25 @@ def train_masked_ppo(
     best_score = -1e9
     history: list[dict[str, Any]] = []
     t_start = time.perf_counter()
+
+    # Evaluate BC warm-start checkpoint before PPO updates so best_policy.pt never regresses below BC
+    if bc_plan_actions and bc_epochs > 0:
+        ev0, best_score = _evaluate_multi_gear(model, kit, timeline, device, gear_conditioned, n_eval_pulls=12)
+        print(
+            f"[BC  Eval  ] eval_surv={ev0['survival_rate_pct']:5.1f}% multi_gear={ev0.get('multi_gear_survival_pct', ev0['survival_rate_pct']):5.1f}% "
+            f"filler={ev0['mean_filler_gcds']:4.1f} gcd_heal={ev0['mean_gcd_heals']:4.2f} oh={ev0['mean_overheal_pct']:4.1f}% "
+            f"worst_party={ev0['worst_party_hp_pct']:4.1f}% worst_mt={ev0['worst_mt_hp_pct']:4.1f}%"
+        )
+        torch.save(
+            {
+                "model_state_dict": model.state_dict(),
+                "hidden_dim": hidden_dim,
+                "kit_label": kit.label,
+                "encounter_name": timeline.encounter_name,
+                "eval": ev0,
+            },
+            out_path / "best_policy.pt",
+        )
 
     for upd in range(1, updates + 1):
         model.eval()
@@ -299,6 +398,30 @@ def train_masked_ppo(
         b_adv = torch.from_numpy(adv).to(device)
         b_ret = torch.from_numpy(ret).to(device)
 
+        # Warm-start the Value head on Update 1 after BC so an uncalibrated critic never shocks the Actor
+        if upd == 1 and bc_anchor_model is not None:
+            model.train()
+            critic_opt = torch.optim.AdamW(model.value_head.parameters(), lr=1e-3)
+            n_steps_w = len(actions_buf)
+            idxs_w = np.arange(n_steps_w)
+            for _ in range(8):
+                np.random.shuffle(idxs_w)
+                for start in range(0, n_steps_w, minibatch_size):
+                    mb = idxs_w[start : start + minibatch_size]
+                    _, val_pred = model.forward(b_states[mb], b_skills[mb], b_futures[mb], b_masks[mb])
+                    c_loss = 0.5 * ((val_pred - b_ret[mb]) ** 2).mean()
+                    critic_opt.zero_grad()
+                    c_loss.backward()
+                    nn.utils.clip_grad_norm_(model.value_head.parameters(), 1.0)
+                    critic_opt.step()
+            # Recompute advantages against the calibrated value baseline
+            with torch.no_grad():
+                _, cal_vals = model.forward(b_states, b_skills, b_futures, b_masks)
+                adv, ret = _compute_gae(rewards_buf, cal_vals.cpu().tolist(), dones_buf, dts_buf)
+                adv = (adv - adv.mean()) / (adv.std() + 1e-8)
+                b_adv = torch.from_numpy(adv).to(device)
+                b_ret = torch.from_numpy(ret).to(device)
+
         model.train()
         n_steps = len(actions_buf)
         idxs = np.arange(n_steps)
@@ -314,7 +437,21 @@ def train_masked_ppo(
                 pg2 = -b_adv[mb] * torch.clamp(ratio, 1.0 - clip_coef, 1.0 + clip_coef)
                 pg_loss = torch.max(pg1, pg2).mean()
                 v_loss = 0.5 * ((new_val - b_ret[mb]) ** 2).mean()
-                loss = pg_loss + vf_coef * v_loss - ent_coef * entropy.mean()
+                kl_loss = torch.tensor(0.0, device=device)
+                if bc_anchor_model is not None and bc_kl_coef > 0.0:
+                    with torch.no_grad():
+                        ref_logits, _ = bc_anchor_model.forward(b_states[mb], b_skills[mb], b_futures[mb], b_masks[mb])
+                        ref_log_probs = torch.log_softmax(ref_logits, dim=-1)
+                    cur_logits, _ = model.forward(b_states[mb], b_skills[mb], b_futures[mb], b_masks[mb])
+                    cur_log_probs = torch.log_softmax(cur_logits, dim=-1)
+                    cur_probs = cur_log_probs.exp()
+                    kl_terms = torch.where(
+                        b_masks[mb],
+                        cur_probs * (cur_log_probs - ref_log_probs),
+                        torch.zeros_like(cur_probs),
+                    )
+                    kl_loss = kl_terms.sum(dim=-1).mean()
+                loss = pg_loss + vf_coef * v_loss - ent_coef * entropy.mean() + bc_kl_coef * kl_loss
 
                 optimizer.zero_grad()
                 loss.backward()
@@ -332,12 +469,12 @@ def train_masked_ppo(
         history.append(row)
 
         if upd == 1 or upd % max(1, updates // 10) == 0 or upd == updates:
-            ev = evaluate_policy(model, kit, timeline, device, n_eval_pulls=18)
-            score = ev["survival_rate_pct"] * 10.0 + ev["mean_reward"]
+            ev, score = _evaluate_multi_gear(model, kit, timeline, device, gear_conditioned, n_eval_pulls=12)
             print(
                 f"[Upd {upd:3d}/{updates}] train_surv={train_surv:5.1f}% ret={mean_ret:6.2f} | "
-                f"eval_surv={ev['survival_rate_pct']:5.1f}% filler={ev['mean_filler_gcds']:4.1f} "
-                f"gcd_heal={ev['mean_gcd_heals']:4.2f} worst_party={ev['worst_party_hp_pct']:4.1f}% "
+                f"eval_surv={ev['survival_rate_pct']:5.1f}% mg={ev.get('multi_gear_survival_pct', ev['survival_rate_pct']):5.1f}% "
+                f"filler={ev['mean_filler_gcds']:4.1f} gcd_heal={ev['mean_gcd_heals']:4.2f} "
+                f"oh={ev['mean_overheal_pct']:4.1f}% worst_party={ev['worst_party_hp_pct']:4.1f}% "
                 f"worst_mt={ev['worst_mt_hp_pct']:4.1f}% ({row['elapsed_s']}s)"
             )
             if score > best_score:
@@ -379,8 +516,15 @@ def infer_with_gear(
     max_hp_party: float | None = None,
     max_hp_tank: float | None = None,
     n_eval_pulls: int = 12,
+    guarantee_100pct: bool = True,
+    worst_case_roll: float = 1.05,
 ) -> dict[str, Any]:
-    """Run a trained gear-conditioned checkpoint with custom runtime gear parameters (no retraining)."""
+    """Run a trained gear-conditioned checkpoint with custom runtime gear parameters (no retraining).
+
+    When `guarantee_100pct=True`, stress-tests the inferred schedule across all 12 server-tick phases
+    under worst-case `+5%` damage roll (`worst_case_roll=1.05`) and adds minimal-DPS-cost safety skills
+    if any phase fails, guaranteeing a 100.0% wipe-free timeline.
+    """
     ckpt = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
     hidden_dim = int(ckpt.get("hidden_dim", 128))
     model = SkillAttentionActorCritic(hidden_dim=hidden_dim)
@@ -401,7 +545,19 @@ def infer_with_gear(
     if max_hp_tank is not None:
         custom_kit.max_hp_tank = max_hp_tank
 
-    return evaluate_policy(model, custom_kit, timeline, torch.device("cpu"), n_eval_pulls=n_eval_pulls)
+    ev = evaluate_policy(model, custom_kit, timeline, torch.device("cpu"), n_eval_pulls=n_eval_pulls)
+    raw_plan = action_log_to_plan(custom_kit, timeline, ev["deterministic_action_log"], partner_trust=1.0)
+    raw_stress = stress_test_plan(custom_kit, timeline, raw_plan, damage_roll=worst_case_roll, n_phases=12)
+    ev["raw_worst_case_105_survival_pct"] = raw_stress.survival_rate_pct
+
+    if guarantee_100pct:
+        hardened_plan, hardened_stress, repairs_added = harden_plan_to_100pct(
+            custom_kit, timeline, raw_plan, damage_roll=worst_case_roll, n_phases=12
+        )
+        ev["hardened_repairs_added"] = repairs_added
+        ev["verified_worst_case_105"] = hardened_stress.to_dict()
+        ev["verified_plan"] = hardened_plan.model_dump(mode="json")
+    return ev
 
 
 def main() -> None:
@@ -412,12 +568,21 @@ def main() -> None:
     parser.add_argument("--episodes-per-update", type=int, default=12)
     parser.add_argument("--hidden-dim", type=int, default=128)
     parser.add_argument("--lr", type=float, default=3e-4)
+    parser.add_argument("--bc-casts", default=None, help="Optional JSON file of expert casts for BC warm-start")
+    parser.add_argument("--bc-epochs", type=int, default=20)
+    parser.add_argument("--bc-skill-weight", type=float, default=15.0)
+    parser.add_argument("--bc-kl-coef", type=float, default=0.05)
+    parser.add_argument("--no-gear-conditioned", action="store_true")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--out-dir", default="outputs/rl_run")
     args = parser.parse_args()
 
     kit = PlayerKit.from_yaml(args.kit)
     timeline = EncounterTimeline.from_yaml(args.timeline)
+    bc_actions = None
+    if args.bc_casts:
+        raw_bc = json.loads(Path(args.bc_casts).read_text(encoding="utf-8"))
+        bc_actions = raw_bc["actions"] if isinstance(raw_bc, dict) and "actions" in raw_bc else raw_bc
     train_masked_ppo(
         kit=kit,
         timeline=timeline,
@@ -425,6 +590,11 @@ def main() -> None:
         episodes_per_update=args.episodes_per_update,
         lr=args.lr,
         hidden_dim=args.hidden_dim,
+        gear_conditioned=not args.no_gear_conditioned,
+        bc_plan_actions=bc_actions,
+        bc_epochs=args.bc_epochs,
+        bc_skill_class_weight=args.bc_skill_weight,
+        bc_kl_coef=args.bc_kl_coef,
         seed=args.seed,
         out_dir=args.out_dir,
     )

@@ -103,6 +103,11 @@ class ResourcePool(BaseModel):
         ge=0.0,
         description="Resource gained on attacking the boss (pauses automatically during downtime)",
     )
+    gain_per_player_aa: float = Field(
+        default=0.0,
+        ge=0.0,
+        description="Resource gained on each player auto-attack against a targetable boss (e.g. Paladin Oath +5/AA; pauses in downtime)",
+    )
     min_reserve: float = Field(default=0.0, ge=0.0, description="Minimum balance to keep in reserve")
 
 
@@ -132,6 +137,12 @@ class SkillDef(BaseModel):
     mitigation_magical: float = Field(default=0.0, ge=0.0, le=1.0)
     stack_group: str | None = None
     shield_value: float = Field(default=0.0, ge=0.0)
+    shield_max_hp_ratio: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description="Optional shield sized as a fraction of target Max HP (e.g. 0.25 for TBN; bypasses heal_scale)",
+    )
     shield_duration_s: float | None = Field(
         default=None,
         ge=0.0,
@@ -143,6 +154,12 @@ class SkillDef(BaseModel):
     )
     heal_instant: float = Field(default=0.0, ge=0.0)
     heal_hot_total: float = Field(default=0.0, ge=0.0)
+    delayed_heal_value: float = Field(
+        default=0.0,
+        ge=0.0,
+        description="Reactive/delayed heal that triggers when target HP falls below delayed_heal_trigger_ratio or on buff expiry (e.g. Excogitation, Shadowed Vigil)",
+    )
+    delayed_heal_trigger_ratio: float = Field(default=0.5, ge=0.0, le=1.0)
     cleanses_debuff: bool = Field(
         default=False,
         description="True for cleanse skills (e.g. Esuna) that remove one cleansable debuff stack",
@@ -222,6 +239,10 @@ class PrePullAction(BaseModel):
         description="Optional override for combo prep (e.g. Recitation+Protraction+Adlo+Deploy crit shield)",
     )
     consumes_cooldown: bool = True
+    consumes_mp: bool = Field(
+        default=False,
+        description="If True, deducts the skill's MP cost at pull start (e.g. -2s Tank TBN that doesn't regen before t=0)",
+    )
 
 
 class GearSamplingRange(BaseModel):
@@ -264,6 +285,16 @@ class PlayerKit(BaseModel):
         description="Optional passive heal on filler attack GCD (e.g. Kardia -> MT); pauses during downtime",
     )
     on_attack_heal_value: float = Field(default=0.0, ge=0.0)
+    pet_auto_heal_per_3s_tick: float = Field(
+        default=0.0,
+        ge=0.0,
+        description="Automatic pet/fairy single-target heal per 3s tick onto lowest-HP channel (e.g. Eos Embrace)",
+    )
+    player_aa_interval_s: float = Field(
+        default=2.24,
+        gt=0.5,
+        description="Player weapon auto-attack delay in seconds (used for player-AA gauges like Paladin Oath)",
+    )
     gear_stats: GearStats = Field(default_factory=GearStats)
     resources: list[ResourcePool] = Field(default_factory=list)
     skills: list[SkillDef] = Field(default_factory=list)
@@ -467,6 +498,10 @@ class PartnerActionProb(BaseModel):
     timing_mean_offset_s: float = -2.0
     timing_std_s: float = Field(default=1.0, ge=0.0)
     sample_count: int = Field(default=1, ge=1)
+    non_tank_only: bool = Field(
+        default=False,
+        description="If True and target_channel=='party', applies ONLY to the non-tank 'party' channel without duplicating onto MT/ST",
+    )
 
     def effective_mitigation(self, damage_type: DamageType) -> float:
         factors = [1.0 - self.mitigation_all]

@@ -8,9 +8,10 @@ burst_interval_s: 120.0
 burst_duration_s: 20.0
 burst_offset_s: 5.0
 burst_weave_slots_per_gcd: 1
-max_hp_party: 170000
-max_hp_tank: 275000
+max_hp_party: 180000
+max_hp_tank: 280000
 tank_raidwide_damage_ratio: 0.62
+pet_auto_heal_per_3s_tick: 11500    # Fairy Embrace (~180p every 3s onto lowest-HP ally)
 
 gear_stats:
   piety: 800
@@ -82,7 +83,7 @@ skills:
   - id: consolation
     name: "セラフ・コンソレイション"
     action_id: 16546
-    cooldown_s: 120.0
+    cooldown_s: 60.0                # 2 charges per 120s Seraph window (60s/charge reproduces 2 casts/window!)
     max_charges: 2
     duration_s: 30.0
     is_gcd: false
@@ -139,7 +140,8 @@ skills:
     is_gcd: false
     weave_cost: 1
     target_scope: single_ally
-    heal_instant: 40000
+    delayed_heal_value: 44000       # Reactive heal triggering at <50% HP or on 45s expiry
+    delayed_heal_trigger_ratio: 0.50
     resource_costs:
       aetherflow: 1
     lead_time_s: 2.0

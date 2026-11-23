@@ -3,9 +3,15 @@
 # so multi-pull PF aggregation does not dilute probabilities across different tank/healer job comps.
 skills:
   # Role / DPS mitigations
-  7535: {name: "リプライザル", role_slot: reprisal, target_channel: boss, stack_group: reprisal, duration_s: 15.0, mitigation_all: 0.10}
-  7549: {name: "牽制", role_slot: feint, target_channel: boss, stack_group: feint, duration_s: 15.0, mitigation_physical: 0.10, mitigation_magical: 0.05}
-  7560: {name: "アドル", role_slot: addle, target_channel: boss, stack_group: addle, duration_s: 15.0, mitigation_magical: 0.10, mitigation_physical: 0.05}
+  7535:  {name: "リプライザル", role_slot: reprisal, target_channel: boss, stack_group: reprisal, duration_s: 15.0, mitigation_all: 0.10}
+  7549:  {name: "牽制", role_slot: feint, target_channel: boss, stack_group: feint, duration_s: 15.0, mitigation_physical: 0.10, mitigation_magical: 0.05}
+  7560:  {name: "アドル", role_slot: addle, target_channel: boss, stack_group: addle, duration_s: 15.0, mitigation_magical: 0.10, mitigation_physical: 0.05}
+  7405:  {name: "レンジ15%軽減 (トルバ/タクティ/サンバ)", role_slot: phys_ranged_mit_15, target_channel: party, stack_group: ranged_mit, duration_s: 15.0, mitigation_all: 0.15}
+  16889: {name: "レンジ15%軽減 (トルバ/タクティ/サンバ)", role_slot: phys_ranged_mit_15, target_channel: party, stack_group: ranged_mit, duration_s: 15.0, mitigation_all: 0.15}
+  16012: {name: "レンジ15%軽減 (トルバ/タクティ/サンバ)", role_slot: phys_ranged_mit_15, target_channel: party, stack_group: ranged_mit, duration_s: 15.0, mitigation_all: 0.15}
+  2887:  {name: "ウェポンブレイク", role_slot: dismantle, target_channel: boss, stack_group: dismantle, duration_s: 10.0, mitigation_all: 0.10}
+  25857: {name: "バマジク", role_slot: caster_party_def, target_channel: party, duration_s: 10.0, mitigation_magical: 0.10}
+  34686: {name: "テンペラグラッサ", role_slot: caster_party_def, target_channel: party, duration_s: 10.0, shield_value: 18000}
 
   # Tank party mitigations (aggregated across PLD/WAR/DRK/GNB)
   16471: {name: "タンク全体軽減 (90s)", role_slot: tank_party_90, target_channel: party, duration_s: 15.0, mitigation_magical: 0.10, mitigation_physical: 0.05}
@@ -49,12 +55,16 @@ skills:
   25861: {name: "アクアヴェール", role_slot: pure_healer_tank_mit, target_channel: mt, duration_s: 8.0, mitigation_all: 0.15}
 
   # Barrier Healers (SCH / SGE when acting as co-healer)
-  188:   {name: "バリアヒラ10%陣/ケーラ", role_slot: barrier_healer_mit_10, target_channel: party, duration_s: 15.0, mitigation_all: 0.10, heal_value: 22000}
-  24298: {name: "バリアヒラ10%陣/ケーラ", role_slot: barrier_healer_mit_10, target_channel: party, duration_s: 15.0, mitigation_all: 0.10, heal_value: 22000}
-  25868: {name: "バリアヒラ120s軽減", role_slot: barrier_healer_mit_120, target_channel: party, duration_s: 20.0, mitigation_all: 0.10}
-  24310: {name: "バリアヒラ120s軽減", role_slot: barrier_healer_mit_120, target_channel: party, duration_s: 20.0, mitigation_all: 0.10, shield_value: 16000, heal_value: 16000}
+  188:   {name: "バリアヒラ10%陣/ケーラ", role_slot: barrier_healer_mit_10, target_channel: party, stack_group: barrier_mit_10, duration_s: 15.0, mitigation_all: 0.10, heal_value: 22000}
+  24298: {name: "バリアヒラ10%陣/ケーラ", role_slot: barrier_healer_mit_10, target_channel: party, stack_group: barrier_mit_10, duration_s: 15.0, mitigation_all: 0.10, heal_value: 22000}
+  25868: {name: "バリアヒラ120s軽減", role_slot: barrier_healer_mit_120, target_channel: party, stack_group: barrier_mit_120, duration_s: 20.0, mitigation_all: 0.10}
+  24310: {name: "バリアヒラ120s軽減", role_slot: barrier_healer_mit_120, target_channel: party, stack_group: barrier_mit_120, duration_s: 20.0, mitigation_all: 0.10, shield_value: 16000, heal_value: 16000}
   16538: {name: "フェイイルミネーション", role_slot: barrier_healer_mag_5, target_channel: party, duration_s: 20.0, mitigation_magical: 0.05}
   16537: {name: "バリアヒラ範囲HoT", role_slot: barrier_healer_hot, target_channel: party, duration_s: 21.0, heal_value: 32000}
   24302: {name: "バリアヒラ範囲HoT", role_slot: barrier_healer_hot, target_channel: party, duration_s: 15.0, heal_value: 28000}
-  16546: {name: "バリアヒラ追加バリア", role_slot: barrier_healer_extra_shield, target_channel: party, duration_s: 30.0, shield_value: 16000, heal_value: 14000}
-  24311: {name: "バリアヒラ追加バリア", role_slot: barrier_healer_extra_shield, target_channel: party, duration_s: 15.0, shield_value: 28000}
+  16546: {name: "バリアヒラ追加バリア", role_slot: barrier_healer_extra_shield, target_channel: party, duration_s: 30.0, shield_value: 20000, heal_value: 14000}
+  24311: {name: "バリアヒラ追加バリア", role_slot: barrier_healer_extra_shield, target_channel: party, duration_s: 15.0, shield_value: 48000}
+  3585:  {name: "展開戦術 (鼓舞展開)", role_slot: barrier_healer_deploy, target_channel: party, duration_s: 30.0, shield_value: 45000, shield_stack_group: gcd_barrier}
+  37013: {name: "バリアヒラGCD全体バリア", role_slot: barrier_healer_gcd_shield, target_channel: party, duration_s: 30.0, shield_value: 22000, shield_stack_group: gcd_barrier}
+  37034: {name: "バリアヒラGCD全体バリア", role_slot: barrier_healer_gcd_shield, target_channel: party, duration_s: 30.0, shield_value: 22000, shield_stack_group: gcd_barrier}
+  37014: {name: "バリアヒラGCD全体バリア", role_slot: barrier_healer_gcd_shield, target_channel: party, duration_s: 20.0, shield_value: 22000, heal_value: 32000}

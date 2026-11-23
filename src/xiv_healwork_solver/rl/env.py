@@ -18,7 +18,7 @@ from xiv_healwork_solver.models import EncounterTimeline, GearSamplingRange, Pla
 from xiv_healwork_solver.sim.engine import EPS, ActionEntry, CombatEngine, build_action_entries
 
 LOOKAHEAD_EVENTS = 8
-STATE_DIM = 32
+STATE_DIM = 33
 SKILL_FEAT_DIM = 20
 EVENT_FEAT_DIM = 14
 
@@ -98,8 +98,14 @@ class FF14HealMitEnv:
             feats[i, 2] = sk.mitigation_all
             feats[i, 3] = sk.mitigation_physical
             feats[i, 4] = sk.mitigation_magical
-            feats[i, 5] = min(1.0, (sk.shield_value * heal_scale) / 40_000.0)
-            feats[i, 6] = min(1.0, (sk.heal_instant * heal_scale) / 50_000.0)
+            sh_eff = (
+                (self.kit.max_hp_tank if entry.target_channel in ("mt", "st") else self.kit.max_hp_party)
+                * sk.shield_max_hp_ratio
+                if sk.shield_max_hp_ratio > 0
+                else sk.shield_value * heal_scale
+            )
+            feats[i, 5] = min(1.0, sh_eff / 40_000.0)
+            feats[i, 6] = min(1.0, (max(sk.heal_instant, sk.delayed_heal_value) * heal_scale) / 50_000.0)
             feats[i, 7] = min(1.0, (sk.heal_hot_total * heal_scale) / 50_000.0)
             feats[i, 8] = 1.0 if sk.is_gcd else 0.0
             feats[i, 9] = min(1.0, sk.cast_time_s / 2.5)
@@ -123,14 +129,22 @@ class FF14HealMitEnv:
         gs = self.gear_sampling
         kit_copy = self.base_kit.model_copy(deep=True)
         kit_copy.gcd_s = round(float(self._gear_rng.uniform(gs.gcd_min, gs.gcd_max)), 2)
-        kit_copy.gear_stats.piety = int(self._gear_rng.integers(gs.piety_min, gs.piety_max + 1))
-        kit_copy.gear_stats.tenacity = int(self._gear_rng.integers(gs.tenacity_min, gs.tenacity_max + 1))
         kit_copy.gear_stats.heal_scale_multiplier = round(
             float(self._gear_rng.uniform(gs.heal_scale_min, gs.heal_scale_max)), 3
         )
-        hp_scale = float(self._gear_rng.uniform(gs.hp_scale_min, gs.hp_scale_max))
-        kit_copy.max_hp_party = round(self.base_kit.max_hp_party * hp_scale, 0)
-        kit_copy.max_hp_tank = round(self.base_kit.max_hp_tank * hp_scale, 0)
+        if self.base_kit.role == "healer":
+            # Healers condition strictly on healer gear parameters (GCD / Piety / Heal Scale / Party HP);
+            # tank HP scales naturally with the encounter tier and is never a healer gear input.
+            kit_copy.gear_stats.piety = int(self._gear_rng.integers(gs.piety_min, gs.piety_max + 1))
+            hp_scale = float(self._gear_rng.uniform(gs.hp_scale_min, gs.hp_scale_max))
+            kit_copy.max_hp_party = round(self.base_kit.max_hp_party * hp_scale, 0)
+            kit_copy.max_hp_tank = round(self.base_kit.max_hp_tank * hp_scale, 0)
+        else:
+            kit_copy.gear_stats.tenacity = int(self._gear_rng.integers(gs.tenacity_min, gs.tenacity_max + 1))
+            hp_scale_party = float(self._gear_rng.uniform(gs.hp_scale_min, gs.hp_scale_max))
+            hp_scale_tank = float(self._gear_rng.uniform(gs.hp_scale_min, gs.hp_scale_max))
+            kit_copy.max_hp_party = round(self.base_kit.max_hp_party * hp_scale_party, 0)
+            kit_copy.max_hp_tank = round(self.base_kit.max_hp_tank * hp_scale_tank, 0)
         return kit_copy
 
     def reset(
@@ -182,11 +196,21 @@ class FF14HealMitEnv:
         reward = imm_reward + adv_reward
         done = False
         if self.engine.died:
-            reward -= 35.0
+            # Strict survival-first hierarchy: a wipe is catastrophically worse than casting safety heals
+            reward -= 200.0
             done = True
         elif self.engine.t >= self.timeline.duration_s - EPS:
-            reward += 10.0
+            reward += 200.0
             done = True
+        else:
+            # Danger-zone margin shaping: discourage riding below 15% HP where a +5% damage roll causes a wipe
+            min_r = min(
+                self.engine.hp["party"] / self.engine.max_hp["party"],
+                self.engine.hp["mt"] / self.engine.max_hp["mt"],
+                self.engine.hp["st"] / self.engine.max_hp["st"],
+            )
+            if min_r < 0.15:
+                reward -= (0.15 - min_r) * 3.0
 
         return self._get_obs(), float(reward), done, {
             "stats": dict(self.engine.stats),
@@ -249,9 +273,10 @@ class FF14HealMitEnv:
         state[28] = min(1.0, active_dot / 20_000.0)
         aa_active = any(seg.start_s <= t <= seg.end_s for seg in self.timeline.auto_attacks) and self.timeline.is_boss_targetable(t)
         state[29] = 1.0 if aa_active else 0.0
-        # Explicit gear parameter channels (heal scale & normalized party max HP)
+        # Explicit gear parameter channels (heal scale, normalized party max HP, normalized tank max HP)
         state[30] = min(2.0, self.kit.gear_stats.heal_scale_multiplier)
-        state[31] = min(2.0, self.kit.max_hp_party / 170_000.0)
+        state[31] = min(2.0, self.kit.max_hp_party / 180_000.0)
+        state[32] = min(2.0, self.kit.max_hp_tank / 280_000.0)
 
         skill_tokens = self._static_skill_feats.copy()
         for entry in self.actions[2:]:

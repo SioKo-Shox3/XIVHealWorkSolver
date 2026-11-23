@@ -301,7 +301,7 @@ def test_rl_env_server_tick_movement_and_mt_st_targeting():
     assert any("-> ST" in lbl for lbl in labels)
 
     obs = env.reset(fixed_tick_phase=1.2)
-    assert obs["state"].shape == (32,)
+    assert obs["state"].shape == (33,)
     assert obs["skills"].shape == (env.n_actions, 20)
     assert obs["future"].shape == (8, 14)
     assert obs["mask"][0]
