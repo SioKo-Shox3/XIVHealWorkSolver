@@ -21,6 +21,7 @@ import numpy as np
 from xiv_healwork_solver.models import (
     DamageEvent,
     EncounterTimeline,
+    HpThresholdTrigger,
     OptimizationPlan,
     PlayerKit,
     ReplayEventSnapshot,
@@ -101,6 +102,13 @@ class _SpecialDebuff:
     expires_at: float
     stacks_remaining: int = 1
     cleared: bool = False
+
+
+@dataclass
+class _HpTriggerState:
+    spec: HpThresholdTrigger
+    triggers_remaining: int
+    next_allowed_t: float = 0.0
 
 
 @dataclass(order=True)
@@ -201,6 +209,8 @@ class CombatEngine:
         self.active_buffs: list[_ActiveBuff] = []
         self.active_dots: list[_ActiveDot] = []
         self.special_debuffs: list[_SpecialDebuff] = []
+        self.hp_triggers: list[_HpTriggerState] = []
+        self._active_trigger_ids: set[str] = set()
         self._event_snapshots_mit: dict[tuple[str, str], float] = {}
         self._queue: list[_ScheduledItem] = []
         self._seq: int = 0
@@ -274,6 +284,12 @@ class CombatEngine:
         self.active_buffs = []
         self.active_dots = []
         self.special_debuffs = []
+        self.hp_triggers = [
+            _HpTriggerState(spec=tr, triggers_remaining=tr.max_triggers, next_allowed_t=tr.start_s)
+            for tr in self.timeline.hp_trigger_mechanics
+            if (tr.end_s >= start_time_s - EPS if start_time_s <= EPS else tr.start_s >= start_time_s - EPS)
+        ]
+        self._active_trigger_ids = set()
         self._event_snapshots_mit = {}
 
         # Apply countdown pre-pull actions (t <= 0s: 0 DPS loss, out-of-combat MP stays full)
@@ -348,6 +364,10 @@ class CombatEngine:
             "mp_min": self.resources.get("mp", 10_000.0),
             "player_heal_raw": 0.0,
             "player_heal_eff": 0.0,
+            "expected_potency_gained": 0.0,
+            "expected_potency_lost": 0.0,
+            "resource_potency_lost": 0.0,
+            "hp_triggers_fired": 0.0,
             "min_party_hp_ratio": self.hp["party"] / self.max_hp["party"],
             "min_mt_hp_ratio": self.hp["mt"] / self.max_hp["mt"],
             "min_st_hp_ratio": self.hp["st"] / self.max_hp["st"],
@@ -367,6 +387,11 @@ class CombatEngine:
         for dw in self.timeline.downtime_windows:
             if dw.start_s >= start_time_s - EPS and dw.clears_boss_debuffs:
                 self._push(dw.start_s, PRIO_DOWNTIME, "downtime_start", dw)
+
+        # Schedule HP-threshold-trigger expiry checks (for must_trigger_before_end mechanics)
+        for tr_state in self.hp_triggers:
+            if tr_state.spec.must_trigger_before_end and tr_state.spec.end_s >= start_time_s - EPS:
+                self._push(tr_state.spec.end_s, PRIO_DEBUFF_EXPIRE, "hp_trigger_expire", tr_state)
 
         # Schedule timeline DamageEvents (separate snapshot and individual multi-hit impacts)
         for ev in self.events:
@@ -518,19 +543,79 @@ class CombatEngine:
         targets = (channel,) if single_channel_only else (("party", "mt", "st") if channel == "party" else (channel,))
         eff = 0.0
         raw_total = amount * len(targets)
+        crossed_channels: list[str] = []
+        # Pass 1: apply healing to ALL target channels first so a party heal heals tanks BEFORE any blast fires!
         for ch in targets:
             before = self.hp[ch]
+            before_ratio = before / self.max_hp[ch]
             self.hp[ch] = min(self.max_hp[ch], before + amount)
             eff += self.hp[ch] - before
+            after_ratio = self.hp[ch] / self.max_hp[ch]
             # Reaching 100% HP clears Full-Heal Doom debuffs on this channel!
             if self.hp[ch] >= self.max_hp[ch] - 1.0:
                 for db in self.special_debuffs:
                     if not db.cleared and db.kind == "full_heal_doom" and db.target_channel == ch:
                         db.cleared = True
+            if after_ratio > before_ratio + 1e-6:
+                crossed_channels.append((ch, before_ratio, after_ratio))  # type: ignore[arg-type]
+
+        # Pass 2: evaluate HP-threshold-triggered damage mechanics for channels that genuinely crossed upward
+        if not self.died and self.hp_triggers and crossed_channels:
+            for ch, before_r, _after_r in crossed_channels:  # type: ignore[misc]
+                for tr_state in self.hp_triggers:
+                    sp = tr_state.spec
+                    if sp.id in self._active_trigger_ids or self.died:
+                        continue
+                    ratio_now = self.hp[ch] / self.max_hp[ch]
+                    if (
+                        tr_state.triggers_remaining > 0
+                        and sp.watch_channel == ch
+                        and sp.start_s - EPS <= self.t <= sp.end_s + EPS
+                        and self.t >= tr_state.next_allowed_t - EPS
+                        and before_r < sp.trigger_hp_ratio - 1e-4
+                        and ratio_now >= sp.trigger_hp_ratio - 1e-4
+                    ):
+                        tr_state.triggers_remaining -= 1
+                        tr_state.next_allowed_t = self.t + sp.trigger_cooldown_s
+                        self.stats["hp_triggers_fired"] += 1.0
+                        self._active_trigger_ids.add(sp.id)
+                        try:
+                            blast_channels = (
+                                ("party", "mt", "st")
+                                if sp.blast_target_scope == "party"
+                                else (("mt", "st") if sp.blast_target_scope == "both_tanks" else (sp.blast_target_scope,))
+                            )
+                            for bch in blast_channels:
+                                b_raw = (
+                                    sp.blast_raw_damage * self.kit.tank_raidwide_damage_ratio
+                                    if (sp.blast_target_scope == "party" and bch in ("mt", "st"))
+                                    else sp.blast_raw_damage
+                                )
+                                self._apply_damage_to_channel(bch, b_raw, sp.blast_damage_type)
+                        finally:
+                            self._active_trigger_ids.discard(sp.id)
         if is_player_heal:
             self.stats["player_heal_raw"] += raw_total
             self.stats["player_heal_eff"] += eff
         return max(0.0, 1.0 - eff / max(1.0, raw_total))
+
+    def active_hp_trigger_summary(self) -> tuple[int, float, float]:
+        """Return (armed_remaining_triggers, max_blast_raw_damage, must_resolve_flag) for RL obs."""
+        rem_cnt = 0
+        max_raw = 0.0
+        must_flag = 0.0
+        for st in self.hp_triggers:
+            sp = st.spec
+            if (
+                st.triggers_remaining > 0
+                and sp.start_s - EPS <= self.t <= sp.end_s + EPS
+                and self.t >= st.next_allowed_t - EPS
+            ):
+                rem_cnt += st.triggers_remaining
+                max_raw = max(max_raw, sp.blast_raw_damage)
+                if sp.must_trigger_before_end:
+                    must_flag = 1.0
+        return rem_cnt, max_raw, must_flag
 
     def _apply_cleanse(self, channel: str) -> bool:
         """Remove one stack of an Esuna-cleansable debuff (returns True if something was cleansed)."""
@@ -894,6 +979,18 @@ class CombatEngine:
                     self.stats["survived"] = 0.0
                 self.max_deficit_hp = max(self.max_deficit_hp, self.max_hp[db.target_channel])
 
+        elif item.kind == "hp_trigger_expire":
+            tr_state: _HpTriggerState = item.payload
+            if tr_state.spec.must_trigger_before_end and tr_state.triggers_remaining > 0:
+                ch = tr_state.spec.watch_channel
+                self.hp[ch] = 0.0
+                if not self.died:
+                    self.died = True
+                    self.first_death_time_s = round(self.t, 3)
+                    self.first_death_channel = f"{ch}(hp_trigger_expired)"
+                    self.stats["survived"] = 0.0
+                self.max_deficit_hp = max(self.max_deficit_hp, self.max_hp[ch])
+
         elif item.kind == "raise":
             raise_cost = self.kit.gear_stats.raise_mp_cost
             if "mp" in self.resources:
@@ -1052,7 +1149,9 @@ class CombatEngine:
                 if pool.gain_per_filler_gcd > 0:
                     self.resources[rname] = min(pool.maximum, self.resources.get(rname, 0.0) + pool.gain_per_filler_gcd)
             self.stats["filler_gcds"] += 1.0
-            reward += 0.45
+            burst_mult = self.kit.burst_dps_multiplier if self.kit.is_in_burst(self.t) else 1.0
+            self.stats["expected_potency_gained"] += self.kit.filler_gcd_potency * burst_mult
+            reward += 0.45 * burst_mult
 
         elif entry.kind == "skill":
             sk = entry.skill
@@ -1106,8 +1205,18 @@ class CombatEngine:
                 self.anim_lock_until = self.t + sk.animation_lock_s
                 self._apply_skill_effects(sk, entry.target_channel)
 
+            pot_loss = self.kit.expected_skill_potency_loss(sk, self.t, is_free_downtime=is_free_downtime_gcd)
+            self.stats["expected_potency_lost"] += pot_loss
+            # Track resource opportunity potency separately (un-multiplied by burst since Aetherflow can be spent at any time)
+            res_pot = sum(
+                rcost * self.resolved_pools[rname].dps_potency_per_unit
+                for rname, rcost in sk.resource_costs.items()
+                if rname in self.resolved_pools and self.resolved_pools[rname].dps_potency_per_unit > 0.0
+            )
+            self.stats["resource_potency_lost"] += res_pot
             if not is_free_downtime_gcd:
-                reward -= sk.dps_cost * 0.40
+                norm_pot_pen = (pot_loss / max(1.0, self.kit.filler_gcd_potency)) * 0.45
+                reward -= max(norm_pot_pen, sk.dps_cost * 0.15)
 
             self.action_log.append(
                 {
@@ -1145,6 +1254,13 @@ class CombatEngine:
         raw_h = self.stats.get("player_heal_raw", 0.0)
         eff_h = self.stats.get("player_heal_eff", 0.0)
         oh_pct = ((raw_h - eff_h) / raw_h) * 100.0 if raw_h > EPS else 0.0
+        pot_gain = self.stats.get("expected_potency_gained", 0.0)
+        pot_loss = self.stats.get("expected_potency_lost", 0.0)
+        res_pot_loss = self.stats.get("resource_potency_lost", 0.0)
+        # Net expected DPS potency: exact filler attack potency gained minus damage-convertible resources spent on heals
+        # (zero double-counting of displaced filler GCDs!)
+        total_pot = max(0.0, pot_gain - res_pot_loss)
+        dps_eff = (total_pot / max(1.0, total_pot + pot_loss)) * 100.0 if (total_pot + pot_loss) > EPS else 100.0
         return ReplayVerification(
             survived=not self.died,
             first_death_time_s=self.first_death_time_s,
@@ -1160,6 +1276,11 @@ class CombatEngine:
             downtime_free_gcds=int(self.stats["downtime_free_gcds"]),
             overheal_pct=round(oh_pct, 1),
             mp_min=round(self.stats["mp_min"], 1),
+            expected_total_potency=round(total_pot, 1),
+            expected_potency_lost=round(pot_loss, 1),
+            resource_potency_lost=round(res_pot_loss, 1),
+            dps_efficiency_pct=round(dps_eff, 2),
+            hp_triggers_fired=int(self.stats.get("hp_triggers_fired", 0.0)),
             event_snapshots=list(self.event_snapshots),
         )
 

@@ -12,6 +12,8 @@ max_hp_party: 180000
 max_hp_tank: 280000
 tank_raidwide_damage_ratio: 0.62
 pet_auto_heal_per_3s_tick: 11500    # Fairy Embrace (~180p every 3s onto lowest-HP ally)
+filler_gcd_potency: 310.0           # Broil IV expected potency per attack GCD
+burst_dps_multiplier: 1.25          # 2-min Chain Stratagem + party raid-buff multiplier
 
 gear_stats:
   piety: 800
@@ -39,6 +41,7 @@ resources:
     initial: 3
     maximum: 3
     regen_per_sec: 0.05            # Aetherflow 3 stacks / 60s (= 0.05/s)
+    dps_potency_per_unit: 100.0    # Opportunity cost of 1 stack vs Energy Drain (100p)
 
 skills:
   - id: sacred_soil

@@ -18,7 +18,7 @@ from xiv_healwork_solver.models import EncounterTimeline, GearSamplingRange, Pla
 from xiv_healwork_solver.sim.engine import EPS, ActionEntry, CombatEngine, build_action_entries
 
 LOOKAHEAD_EVENTS = 8
-STATE_DIM = 33
+STATE_DIM = 36
 SKILL_FEAT_DIM = 20
 EVENT_FEAT_DIM = 14
 
@@ -277,6 +277,11 @@ class FF14HealMitEnv:
         state[30] = min(2.0, self.kit.gear_stats.heal_scale_multiplier)
         state[31] = min(2.0, self.kit.max_hp_party / 180_000.0)
         state[32] = min(2.0, self.kit.max_hp_tank / 280_000.0)
+        # Generic HP-threshold-triggered damage mechanic awareness (e.g. full-heal triggers raidwide blast)
+        tr_cnt, tr_raw, tr_must = eng.active_hp_trigger_summary()
+        state[33] = min(1.0, tr_cnt / 3.0)
+        state[34] = min(1.0, tr_raw / 250_000.0)
+        state[35] = tr_must
 
         skill_tokens = self._static_skill_feats.copy()
         for entry in self.actions[2:]:

@@ -17,6 +17,7 @@ from xiv_healwork_solver.models import (
     EncounterTimeline,
     GearSamplingRange,
     GearStats,
+    HpThresholdTrigger,
     LogFilterConfig,
     PartnerActionProb,
     PlayerKit,
@@ -586,7 +587,7 @@ def test_prepull_critlo_deploy_and_gear_conditioned_sampling():
     for _ in range(5):
         obs = env.reset(deterministic=False)
         seen_gcds.add(env.kit.gcd_s)
-        assert obs["state"].shape == (33,)
+        assert obs["state"].shape == (36,)
     assert len(seen_gcds) >= 3
 
     # Overheal efficiency scoring: lower overheal ranks strictly higher
@@ -960,6 +961,308 @@ def test_worst_case_105_stress_verifier_and_100pct_hardener():
     assert after.survival_rate_pct == 100.0
     assert repairs == 1
     assert hardened.actions[0].skill_id == "soil"
+
+
+def test_hp_full_heal_trigger_blast_mechanic_and_mitigated_resolution():
+    """Verify generic HP-threshold-triggered raidwide blast (e.g. Ultimate full-heal trigger):
+    1) Topping off to 100% HP without mitigation triggers an unmitigated blast -> WIPE.
+    2) Mitigating first and THEN topping off triggers the blast safely -> SURVIVES & resolves must_trigger_before_end.
+    3) Never topping off before end_s when must_trigger_before_end=True -> lethal expiry.
+    4) RL observation exposes active trigger count, blast raw damage, and must-resolve flag.
+    """
+    kit = PlayerKit(
+        label="Ultimate SCH",
+        role="healer",
+        max_hp_party=100_000,
+        max_hp_tank=180_000,
+        base_weave_slots_per_gcd=2,
+        burst_weave_slots_per_gcd=2,
+        skills=[
+            SkillDef(
+                id="mit_15",
+                name="全体15%軽減",
+                cooldown_s=60.0,
+                duration_s=15.0,
+                is_gcd=False,
+                weave_cost=1,
+                target_scope="party",
+                mitigation_all=0.15,
+            ),
+            SkillDef(
+                id="big_heal",
+                name="全体大戻し",
+                cooldown_s=30.0,
+                duration_s=0.0,
+                is_gcd=False,
+                weave_cost=1,
+                target_scope="party",
+                heal_instant=60_000,
+            ),
+        ],
+    )
+    tl = EncounterTimeline(
+        encounter_name="Full-Heal Trigger Blast Test",
+        duration_s=25.0,
+        events=[DamageEvent(id="e1", time_s=5.0, name="Opening Hit", raw_damage=50_000)],
+        hp_trigger_mechanics=[
+            HpThresholdTrigger(
+                id="fh_blast",
+                name="Full-Heal Party Blast",
+                start_s=5.0,
+                end_s=18.0,
+                watch_channel="party",
+                trigger_hp_ratio=1.0,
+                blast_target_scope="party",
+                blast_raw_damage=110_000,  # Lethal unmitigated (110k > 100k), survivable with 15% mit (93.5k < 100k)!
+                max_triggers=1,
+                must_trigger_before_end=True,
+            )
+        ],
+    )
+
+    # Case 1: Heal to 100% WITHOUT mitigation -> triggers 110k blast -> WIPE!
+    eng1 = CombatEngine(kit=kit, timeline=tl, damage_variance=0.0, raise_prob_per_pull=0.0)
+    eng1.reset(deterministic=True, fixed_tick_phase=1.5)
+    eng1.advance_to(7.0)
+    idx_heal = next(a.index for a in eng1.actions if a.skill and a.skill.id == "big_heal")
+    idx_mit = next(a.index for a in eng1.actions if a.skill and a.skill.id == "mit_15")
+    eng1.execute_action(idx_heal)
+    assert eng1.died is True
+    assert eng1.stats["hp_triggers_fired"] == 1.0
+
+    # Case 2: Mitigate FIRST, THEN heal to 100% -> triggers 93.5k blast -> SURVIVES & resolves!
+    eng2 = CombatEngine(kit=kit, timeline=tl, damage_variance=0.0, raise_prob_per_pull=0.0)
+    eng2.reset(deterministic=True, fixed_tick_phase=1.5)
+    eng2.advance_to(7.0)
+    eng2.execute_action(idx_mit)
+    eng2.advance_to(8.0)
+    eng2.execute_action(idx_heal)
+    eng2.advance_to(20.0)
+    v2 = eng2.build_verification()
+    assert v2.survived is True
+    assert v2.hp_triggers_fired == 1
+    assert v2.min_hp_ratio["party"] == pytest.approx(0.065, abs=0.01)
+
+    # Case 3: Never top off before end_s (18s) -> lethal expiry!
+    eng3 = CombatEngine(kit=kit, timeline=tl, damage_variance=0.0, raise_prob_per_pull=0.0)
+    eng3.reset(deterministic=True, fixed_tick_phase=1.5)
+    eng3.advance_to(20.0)
+    assert eng3.died is True
+    assert eng3.first_death_channel == "party(hp_trigger_expired)"
+
+    # Case 4: RL env exposes active HP-trigger features in obs["state"][33:36]
+    env = FF14HealMitEnv(kit, tl, damage_variance=0.0, raise_prob_per_pull=0.0, seed=1)
+    env.reset(deterministic=True, fixed_tick_phase=1.5)
+    env.engine.advance_to(7.0)
+    obs = env._get_obs()
+    assert obs["state"][33] > 0.0  # active trigger count
+    assert obs["state"][34] == pytest.approx(110_000 / 250_000, abs=1e-4)
+    assert obs["state"][35] == 1.0  # must_trigger_before_end
+
+
+def test_expected_dps_maximization_prunes_and_swaps_to_0p_ogcd_at_100pct_survival():
+    """Verify maximize_dps_at_100pct_survival removes redundant 310p GCD heals and swaps to 0p oGCDs
+    while strictly preserving 100.0% survival at worst-case +5% roll x 12 server-tick phases."""
+    from xiv_healwork_solver.models import OptimizationPlan, PlannedAction
+    from xiv_healwork_solver.sim.safety import maximize_dps_at_100pct_survival, stress_test_plan
+
+    kit = PlayerKit(
+        label="DPS Max SCH",
+        role="healer",
+        gcd_s=2.40,
+        max_hp_party=100_000,
+        max_hp_tank=180_000,
+        filler_gcd_potency=310.0,
+        burst_dps_multiplier=1.25,
+        burst_offset_s=5.0,
+        burst_duration_s=20.0,
+        burst_weave_slots_per_gcd=2,
+        skills=[
+            SkillDef(
+                id="free_ogcd_mit",
+                name="無料0p全体軽減",
+                cooldown_s=60.0,
+                duration_s=15.0,
+                is_gcd=False,
+                weave_cost=1,
+                target_scope="party",
+                mitigation_all=0.15,
+                dps_cost=0.01,
+            ),
+            SkillDef(
+                id="gcd_shield",
+                name="意気軒昂の策",
+                cooldown_s=2.4,
+                duration_s=30.0,
+                cast_time_s=0.0,
+                is_gcd=True,
+                weave_cost=0,
+                target_scope="party",
+                shield_value=20_000,
+                dps_cost=1.0,
+            ),
+        ],
+    )
+    tl = EncounterTimeline(
+        encounter_name="DPS Maximization Test",
+        duration_s=30.0,
+        events=[DamageEvent(id="e1", time_s=15.0, name="Raidwide", raw_damage=98_000)],
+    )
+    # Wasteful plan: casts TWO 310p GCD shields (one redundant, one replaceable by 0p free_ogcd_mit!)
+    wasteful = OptimizationPlan(
+        encounter_name=tl.encounter_name,
+        kit_label=kit.label,
+        preset="balanced",
+        status="wasteful",
+        objective_value=0.0,
+        partner_trust=1.0,
+        actions=[
+            PlannedAction(
+                event_id="e1", event_name="Raidwide", event_time_s=15.0, cast_at_s=8.0,
+                skill_id="gcd_shield", skill_name="意気軒昂の策", target_scope="party",
+                target_channel="party", is_gcd=True, weave_cost=0,
+            ),
+            PlannedAction(
+                event_id="e1", event_name="Raidwide", event_time_s=15.0, cast_at_s=12.0,
+                skill_id="gcd_shield", skill_name="意気軒昂の策", target_scope="party",
+                target_channel="party", is_gcd=True, weave_cost=0,
+            ),
+        ],
+        evaluations=[],
+    )
+    before = stress_test_plan(kit, tl, wasteful, damage_roll=1.05, n_phases=12)
+    assert before.survival_rate_pct == 100.0
+    assert before.mean_gcd_heals == 2.0
+
+    opt_plan, after, stats = maximize_dps_at_100pct_survival(kit, tl, wasteful, damage_roll=1.05, n_phases=12)
+    assert after.survival_rate_pct == 100.0
+    assert after.mean_gcd_heals == 0.0  # Both 310p GCD shields eliminated (1 pruned, 1 swapped to 0p oGCD!)
+    assert after.mean_potency_lost < before.mean_potency_lost
+    assert after.mean_expected_potency > before.mean_expected_potency
+    assert after.mean_dps_efficiency_pct > before.mean_dps_efficiency_pct
+    assert stats["pruned"] >= 1 and stats["swapped"] >= 1
+
+
+def test_codex_hp_trigger_and_potency_p1_regressions():
+    """Regression test for Codex P1 findings:
+    1) stress_test_plan catches full-heal trigger wipes at 1.00x / 0.95x rolls even if 1.05x survives.
+    2) Party heal heals MT/ST BEFORE full-heal trigger blast fires (no false tank wipe).
+    3) Pure overheal while already at 100% HP does not repeatedly consume multi-trigger blasts.
+    4) direct_potency_loss overrides derived GCD potency loss cleanly.
+    """
+    from xiv_healwork_solver.models import OptimizationPlan, PlannedAction
+    from xiv_healwork_solver.sim.safety import stress_test_plan
+
+    kit = PlayerKit(
+        label="Trigger Edge SCH",
+        role="healer",
+        max_hp_party=100_000,
+        max_hp_tank=100_000,
+        filler_gcd_potency=310.0,
+        base_weave_slots_per_gcd=2,
+        burst_weave_slots_per_gcd=2,
+        skills=[
+            SkillDef(
+                id="aoe_heal_50k",
+                name="50k全体ヒール",
+                cooldown_s=5.0,
+                duration_s=0.0,
+                is_gcd=False,
+                weave_cost=1,
+                target_scope="party",
+                heal_instant=50_000,
+            ),
+            SkillDef(
+                id="override_gcd",
+                name="上書き威力GCD",
+                cooldown_s=2.5,
+                duration_s=0.0,
+                is_gcd=True,
+                weave_cost=0,
+                direct_potency_loss=100.0,
+            ),
+        ],
+    )
+    # 4) direct_potency_loss override reduces derived 310p loss to 100p (outside burst)
+    assert kit.expected_skill_potency_loss(kit.skills[1], 1.0, False) == pytest.approx(100.0)
+
+    # 1) 50k hit + 50k heal + lethal 110k full-HP blast: survives +5% roll (HP=97.5k), WIPES at 1.00x/0.95x!
+    tl_low_roll = EncounterTimeline(
+        encounter_name="Low Roll Trigger Trap",
+        duration_s=15.0,
+        events=[DamageEvent(id="e1", time_s=5.0, name="Hit", raw_damage=50_000)],
+        hp_trigger_mechanics=[
+            HpThresholdTrigger(
+                id="tr1",
+                name="Lethal Full-Heal Blast",
+                start_s=5.0,
+                end_s=12.0,
+                watch_channel="party",
+                trigger_hp_ratio=1.0,
+                blast_target_scope="party",
+                blast_raw_damage=110_000,
+                max_triggers=1,
+                must_trigger_before_end=False,
+            )
+        ],
+    )
+    plan_trap = OptimizationPlan(
+        encounter_name=tl_low_roll.encounter_name,
+        kit_label=kit.label,
+        preset="balanced",
+        status="test",
+        objective_value=0.0,
+        partner_trust=1.0,
+        actions=[
+            PlannedAction(
+                event_id="e1", event_name="Hit", event_time_s=5.0, cast_at_s=7.0,
+                skill_id="aoe_heal_50k", skill_name="50k全体ヒール", target_scope="party",
+                target_channel="party", is_gcd=False, weave_cost=1,
+            )
+        ],
+        evaluations=[],
+    )
+    rep_trap = stress_test_plan(kit, tl_low_roll, plan_trap, damage_roll=1.05, n_phases=4)
+    assert rep_trap.survival_rate_pct < 100.0  # Must catch the 0.95x and 1.00x wipes!
+
+    # 2) Party heal heals ALL channels (party/mt/st) from 50k->100k BEFORE 60k blast fires -> everyone ends at 40k ALIVE!
+    tl_tank_order = EncounterTimeline(
+        encounter_name="Party Heal Order Test",
+        duration_s=15.0,
+        events=[DamageEvent(id="e1", time_s=5.0, name="Hit", raw_damage=50_000)],
+        hp_trigger_mechanics=[
+            HpThresholdTrigger(
+                id="tr_ord",
+                name="60k Blast",
+                start_s=5.0,
+                end_s=14.0,
+                watch_channel="party",
+                trigger_hp_ratio=1.0,
+                blast_target_scope="party",
+                blast_raw_damage=60_000,
+                max_triggers=2,
+                trigger_cooldown_s=1.0,
+                must_trigger_before_end=False,
+            )
+        ],
+    )
+    eng = CombatEngine(kit=kit, timeline=tl_tank_order, damage_variance=0.0, raise_prob_per_pull=0.0)
+    eng.reset(deterministic=True, fixed_tick_phase=1.5)
+    eng.advance_to(7.0)
+    idx_h = next(a.index for a in eng.actions if a.skill and a.skill.id == "aoe_heal_50k")
+    eng.execute_action(idx_h)
+    assert eng.died is False
+    assert eng.hp["party"] == pytest.approx(40_000.0)
+    assert eng.hp["mt"] == pytest.approx(40_000.0)
+    assert eng.stats["hp_triggers_fired"] == 1.0
+
+    # 3) Pure overheal when already at 100% HP must NOT consume another trigger!
+    eng.hp["party"] = 100_000.0
+    eng.advance_to(10.0)
+    eng._apply_heal("party", 20_000.0)
+    assert eng.stats["hp_triggers_fired"] == 1.0  # Still 1, NOT 2!
+
+
 
 
 

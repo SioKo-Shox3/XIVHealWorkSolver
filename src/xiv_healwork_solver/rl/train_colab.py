@@ -21,7 +21,12 @@ import torch.nn as nn
 from xiv_healwork_solver.models import EncounterTimeline, GearSamplingRange, PlayerKit
 from xiv_healwork_solver.rl.env import FF14HealMitEnv
 from xiv_healwork_solver.rl.model import SkillAttentionActorCritic
-from xiv_healwork_solver.sim.safety import action_log_to_plan, harden_plan_to_100pct, stress_test_plan
+from xiv_healwork_solver.sim.safety import (
+    action_log_to_plan,
+    harden_plan_to_100pct,
+    maximize_dps_at_100pct_survival,
+    stress_test_plan,
+)
 
 
 def _compute_gae(
@@ -554,7 +559,14 @@ def infer_with_gear(
         hardened_plan, hardened_stress, repairs_added = harden_plan_to_100pct(
             custom_kit, timeline, raw_plan, damage_roll=worst_case_roll, n_phases=12
         )
+        if hardened_stress.survival_rate_pct >= 100.0:
+            hardened_plan, hardened_stress, dps_opt_stats = maximize_dps_at_100pct_survival(
+                custom_kit, timeline, hardened_plan, damage_roll=worst_case_roll, n_phases=12
+            )
+        else:
+            dps_opt_stats = {"pruned": 0, "swapped": 0, "burst_shifted": 0}
         ev["hardened_repairs_added"] = repairs_added
+        ev["dps_opt_stats"] = dps_opt_stats
         ev["verified_worst_case_105"] = hardened_stress.to_dict()
         ev["verified_plan"] = hardened_plan.model_dump(mode="json")
     return ev

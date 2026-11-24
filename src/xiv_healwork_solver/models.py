@@ -108,6 +108,11 @@ class ResourcePool(BaseModel):
         ge=0.0,
         description="Resource gained on each player auto-attack against a targetable boss (e.g. Paladin Oath +5/AA; pauses in downtime)",
     )
+    dps_potency_per_unit: float = Field(
+        default=0.0,
+        ge=0.0,
+        description="Expected DPS potency lost per 1 unit spent on healing/mitigation instead of damage (e.g. Aetherflow = 100p Energy Drain)",
+    )
     min_reserve: float = Field(default=0.0, ge=0.0, description="Minimum balance to keep in reserve")
 
 
@@ -177,6 +182,11 @@ class SkillDef(BaseModel):
     # Scheduling / ergonomic metadata
     lead_time_s: float = Field(default=1.5, ge=0.0)
     dps_cost: float = Field(default=0.05, ge=0.0)
+    direct_potency_loss: float = Field(
+        default=0.0,
+        ge=0.0,
+        description="Optional direct potency loss override (e.g. special stance/channeling cost); 0 derives from GCD + resource potency",
+    )
     notes: str = ""
 
     def effective_mitigation(self, damage_type: DamageType) -> float:
@@ -295,6 +305,17 @@ class PlayerKit(BaseModel):
         gt=0.5,
         description="Player weapon auto-attack delay in seconds (used for player-AA gauges like Paladin Oath)",
     )
+    filler_gcd_potency: float = Field(
+        default=310.0,
+        ge=0.0,
+        description="Expected potency of one filler attack GCD (e.g. Broil IV = 310p)",
+    )
+    burst_dps_multiplier: float = Field(
+        default=1.25,
+        ge=1.0,
+        le=2.0,
+        description="Expected raid-buff DPS multiplier during 2-min burst windows",
+    )
     gear_stats: GearStats = Field(default_factory=GearStats)
     resources: list[ResourcePool] = Field(default_factory=list)
     skills: list[SkillDef] = Field(default_factory=list)
@@ -303,6 +324,30 @@ class PlayerKit(BaseModel):
         description="Countdown prep actions cast before t=0 (e.g. -3s Pre-pull Deploy / Shield / Star)",
     )
     weave_overrides: list[WeaveOverrideWindow] = Field(default_factory=list)
+
+    def is_in_burst(self, time_s: float) -> bool:
+        """Return True if `time_s` falls inside a party raid-buff burst window."""
+        if self.burst_duration_s <= 0.0 or time_s < self.burst_offset_s:
+            return False
+        return ((time_s - self.burst_offset_s) % self.burst_interval_s) < self.burst_duration_s
+
+    def expected_skill_potency_loss(self, sk: SkillDef, time_s: float, is_free_downtime: bool = False) -> float:
+        """Exact burst-weighted expected DPS potency lost by casting `sk` at `time_s`.
+
+        - Downtime pre-shields that finish before boss return lose 0 GCD potency.
+        - Resource opportunity cost (e.g. Aetherflow -> Energy Drain 100p) still counts if spent.
+        - Casting inside a 2-min burst window multiplies potency loss by `burst_dps_multiplier`.
+        """
+        mult = self.burst_dps_multiplier if self.is_in_burst(time_s) else 1.0
+        pool_map = {p.name: p for p in self.resources}
+        res_loss = sum(
+            rcost * pool_map[rname].dps_potency_per_unit
+            for rname, rcost in sk.resource_costs.items()
+            if rname in pool_map and pool_map[rname].dps_potency_per_unit > 0.0
+        )
+        gcd_loss = 0.0 if (is_free_downtime or not sk.is_gcd) else self.filler_gcd_potency
+        base_loss = sk.direct_potency_loss if sk.direct_potency_loss > 0.0 else (gcd_loss + res_loss)
+        return round(base_loss * mult, 2)
 
     def weave_budget_at(self, time_s: float) -> int:
         """Return available oGCD weave slots per GCD around `time_s`."""
@@ -515,6 +560,34 @@ class PartnerActionProb(BaseModel):
         return max(0.0, min(1.0, 1.0 - remaining))
 
 
+class HpThresholdTrigger(BaseModel):
+    """Generic mechanic where reaching an HP threshold triggers party/target damage.
+
+    Models Ultimate/Savage full-heal-triggered blasts (e.g. healing a player/party to 100% HP
+    immediately unleashes a mitigable raidwide burst). Supports both:
+    - `must_trigger_before_end=False`: avoid accidentally topping off before mitigation is ready
+      or right before another raidwide.
+    - `must_trigger_before_end=True`: must be resolved (topped off) safely before `end_s` or wipe,
+      forcing controlled mitigation + staggered recovery timing.
+    """
+
+    id: str
+    name: str = "HP Full-Heal Trigger Blast"
+    start_s: float = Field(ge=0.0)
+    end_s: float = Field(gt=0.0)
+    watch_channel: Literal["party", "mt", "st"] = "party"
+    trigger_hp_ratio: float = Field(default=1.0, gt=0.0, le=1.0)
+    blast_target_scope: EventTargetScope = "party"
+    blast_raw_damage: float = Field(gt=0.0)
+    blast_damage_type: DamageType = "magical"
+    max_triggers: int = Field(default=1, ge=1)
+    trigger_cooldown_s: float = Field(default=1.0, ge=0.0)
+    must_trigger_before_end: bool = Field(
+        default=False,
+        description="If True, failing to trigger all `max_triggers` before `end_s` causes lethal expiry",
+    )
+
+
 class PartnerBaselineHealing(BaseModel):
     """Continuous baseline effective healing per 3s tick from co-healer & tank self-sustain (from FFLogs Healing)."""
 
@@ -533,6 +606,10 @@ class EncounterTimeline(BaseModel):
     movement_windows: list[MovementWindow] = Field(default_factory=list)
     downtime_windows: list[DowntimeWindow] = Field(default_factory=list)
     auto_attacks: list[AutoAttackSegment] = Field(default_factory=list)
+    hp_trigger_mechanics: list[HpThresholdTrigger] = Field(
+        default_factory=list,
+        description="Generic HP-threshold-triggered damage mechanics (e.g. full-heal triggers raidwide blast)",
+    )
     partner_profile: list[PartnerActionProb] = Field(default_factory=list)
     partner_baseline_healing: PartnerBaselineHealing = Field(default_factory=PartnerBaselineHealing)
 
@@ -655,6 +732,11 @@ class ReplayVerification(BaseModel):
     downtime_free_gcds: int = 0
     overheal_pct: float = 0.0
     mp_min: float = 10_000.0
+    expected_total_potency: float = 0.0
+    expected_potency_lost: float = 0.0
+    resource_potency_lost: float = 0.0
+    dps_efficiency_pct: float = 100.0
+    hp_triggers_fired: int = 0
     event_snapshots: list[ReplayEventSnapshot] = Field(default_factory=list)
 
 
