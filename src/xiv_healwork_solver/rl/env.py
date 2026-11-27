@@ -36,11 +36,12 @@ class FF14HealMitEnv:
         kit: PlayerKit,
         timeline: EncounterTimeline,
         damage_variance: float = 0.05,
-        raise_prob_per_pull: float = 0.35,
+        raise_prob_per_pull: float = 0.0,
         tank_passive_self_heal_per_tick: float = 0.0,
         partner_trust_scale: float = 1.0,
         max_wait_s: float = 1.0,
         gear_sampling: GearSamplingRange | None = None,
+        expected_partners: bool = True,
         seed: int | None = None,
     ) -> None:
         self.base_kit = kit
@@ -52,6 +53,7 @@ class FF14HealMitEnv:
         self.partner_trust_scale = partner_trust_scale
         self.max_wait_s = max_wait_s
         self.gear_sampling = gear_sampling
+        self.expected_partners = expected_partners
         self._gear_rng = np.random.default_rng(seed)
         self.engine = CombatEngine(
             kit=kit,
@@ -60,6 +62,7 @@ class FF14HealMitEnv:
             raise_prob_per_pull=raise_prob_per_pull,
             partner_trust_scale=partner_trust_scale,
             tank_passive_self_heal_per_tick=tank_passive_self_heal_per_tick,
+            expected_partners=expected_partners,
             seed=seed,
         )
         self.actions: list[ActionEntry] = self.engine.actions
@@ -129,21 +132,26 @@ class FF14HealMitEnv:
         gs = self.gear_sampling
         kit_copy = self.base_kit.model_copy(deep=True)
         kit_copy.gcd_s = round(float(self._gear_rng.uniform(gs.gcd_min, gs.gcd_max)), 2)
+        # Sample a correlated tier/iLvl progression factor (Week-1 low-iLvl -> BiS high-iLvl)
+        # plus small independent food/meld jitter so the policy learns both iLvl scaling and off-meta gear!
+        tier_u = float(self._gear_rng.uniform(0.0, 1.0))
+        hp_center = gs.hp_scale_min + tier_u * (gs.hp_scale_max - gs.hp_scale_min)
+        heal_center = gs.heal_scale_min + tier_u * (gs.heal_scale_max - gs.heal_scale_min)
+        hp_scale = float(np.clip(hp_center + self._gear_rng.uniform(-0.03, 0.03), gs.hp_scale_min, gs.hp_scale_max))
+        heal_scale = float(np.clip(heal_center + self._gear_rng.uniform(-0.03, 0.03), gs.heal_scale_min, gs.heal_scale_max))
         kit_copy.gear_stats.heal_scale_multiplier = round(
-            float(self._gear_rng.uniform(gs.heal_scale_min, gs.heal_scale_max)), 3
+            self.base_kit.gear_stats.heal_scale_multiplier * heal_scale, 3
         )
         if self.base_kit.role == "healer":
             # Healers condition strictly on healer gear parameters (GCD / Piety / Heal Scale / Party HP);
             # tank HP scales naturally with the encounter tier and is never a healer gear input.
             kit_copy.gear_stats.piety = int(self._gear_rng.integers(gs.piety_min, gs.piety_max + 1))
-            hp_scale = float(self._gear_rng.uniform(gs.hp_scale_min, gs.hp_scale_max))
             kit_copy.max_hp_party = round(self.base_kit.max_hp_party * hp_scale, 0)
             kit_copy.max_hp_tank = round(self.base_kit.max_hp_tank * hp_scale, 0)
         else:
             kit_copy.gear_stats.tenacity = int(self._gear_rng.integers(gs.tenacity_min, gs.tenacity_max + 1))
-            hp_scale_party = float(self._gear_rng.uniform(gs.hp_scale_min, gs.hp_scale_max))
-            hp_scale_tank = float(self._gear_rng.uniform(gs.hp_scale_min, gs.hp_scale_max))
-            kit_copy.max_hp_party = round(self.base_kit.max_hp_party * hp_scale_party, 0)
+            hp_scale_tank = float(np.clip(hp_center + self._gear_rng.uniform(-0.04, 0.04), gs.hp_scale_min, gs.hp_scale_max))
+            kit_copy.max_hp_party = round(self.base_kit.max_hp_party * hp_scale, 0)
             kit_copy.max_hp_tank = round(self.base_kit.max_hp_tank * hp_scale_tank, 0)
         return kit_copy
 
@@ -153,6 +161,8 @@ class FF14HealMitEnv:
         deterministic: bool = False,
         fixed_tick_phase: float | None = None,
     ) -> dict[str, np.ndarray]:
+        if seed is not None:
+            self._gear_rng = np.random.default_rng(int(seed) + 7919)
         if self.gear_sampling is not None and not deterministic:
             self.kit = self._sample_gear_kit()
             self.engine = CombatEngine(
@@ -162,6 +172,7 @@ class FF14HealMitEnv:
                 raise_prob_per_pull=self.raise_prob_per_pull,
                 partner_trust_scale=self.partner_trust_scale,
                 tank_passive_self_heal_per_tick=self.tank_passive_self_heal_per_tick,
+                expected_partners=self.expected_partners,
                 seed=seed,
             )
             self._static_skill_feats = self._build_static_skill_feats()
@@ -175,6 +186,7 @@ class FF14HealMitEnv:
                     raise_prob_per_pull=self.raise_prob_per_pull,
                     partner_trust_scale=self.partner_trust_scale,
                     tank_passive_self_heal_per_tick=self.tank_passive_self_heal_per_tick,
+                    expected_partners=self.expected_partners,
                     seed=seed,
                 )
                 self._static_skill_feats = self._build_static_skill_feats()
@@ -203,6 +215,8 @@ class FF14HealMitEnv:
             reward += 200.0
             done = True
         else:
+            # Dense survival progress reward so staying alive through late mechanics strictly dominates greedy DPS!
+            reward += 0.10 * dt_elapsed
             # Danger-zone margin shaping: discourage riding below 15% HP where a +5% damage roll causes a wipe
             min_r = min(
                 self.engine.hp["party"] / self.engine.max_hp["party"],

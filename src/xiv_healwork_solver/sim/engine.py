@@ -161,6 +161,7 @@ class CombatEngine:
         partner_trust_scale: float = 1.0,
         tank_passive_self_heal_per_tick: float = 0.0,
         forced_damage_roll: float | None = None,
+        expected_partners: bool = False,
         seed: int | None = None,
     ) -> None:
         self.kit = kit
@@ -170,6 +171,7 @@ class CombatEngine:
         self.partner_trust_scale = partner_trust_scale
         self.tank_passive_self_heal_per_tick = tank_passive_self_heal_per_tick
         self.forced_damage_roll = forced_damage_roll
+        self.expected_partners = expected_partners
         self.rng = np.random.default_rng(seed)
 
         self.events = sorted(timeline.events, key=lambda e: e.time_s)
@@ -428,9 +430,9 @@ class CombatEngine:
             p = min(1.0, pa.probability * self.partner_trust_scale)
             if p <= EPS:
                 continue
-            if deterministic:
-                # Expected-value scaling in deterministic mode matches stochastic expectation E[X] = p * X
-                # without losing cross-comp p=0.33 mitigations/shields to a hard 0.5 cliff.
+            if deterministic or self.expected_partners:
+                # Expected-value scaling matches stochastic expectation E[X] = p * X
+                # without losing cross-comp p=0.33 mitigations/shields to unsolvable Bernoulli cliffs.
                 pa_eff = pa if p >= 1.0 - EPS else pa.model_copy(
                     update={
                         "mitigation_all": pa.mitigation_all * p,
@@ -440,7 +442,7 @@ class CombatEngine:
                         "heal_value": pa.heal_value * p,
                     }
                 )
-                jitter = 0.0
+                jitter = 0.0 if deterministic else float(self.rng.normal(0.0, min(0.5, pa.timing_std_s * 0.25)))
             else:
                 if float(self.rng.random()) >= p:
                     continue
@@ -819,7 +821,7 @@ class CombatEngine:
                     if ev.mechanic_effect == "normal" and ratio < ev.min_survival_hp_ratio:
                         self._step_reward_accum -= (ev.min_survival_hp_ratio - ratio) * 6.0
                     elif is_last_hit:
-                        self._step_reward_accum += 0.4
+                        self._step_reward_accum += 2.5
 
                 if is_last_hit and ev.doom_full_heal_duration_s is not None and not killed:
                     if self.hp[ch] < self.max_hp[ch] - 1.0:
@@ -1151,7 +1153,7 @@ class CombatEngine:
             self.stats["filler_gcds"] += 1.0
             burst_mult = self.kit.burst_dps_multiplier if self.kit.is_in_burst(self.t) else 1.0
             self.stats["expected_potency_gained"] += self.kit.filler_gcd_potency * burst_mult
-            reward += 0.45 * burst_mult
+            reward += 0.15 * burst_mult
 
         elif entry.kind == "skill":
             sk = entry.skill
@@ -1215,8 +1217,12 @@ class CombatEngine:
             )
             self.stats["resource_potency_lost"] += res_pot
             if not is_free_downtime_gcd:
-                norm_pot_pen = (pot_loss / max(1.0, self.kit.filler_gcd_potency)) * 0.45
-                reward -= max(norm_pot_pen, sk.dps_cost * 0.15)
+                # Displaced filler GCD already forfeits +0.15 filler reward (no double penalty!);
+                # only penalize damage-convertible resource opportunity cost (e.g. Aetherflow -> Energy Drain)
+                # plus a tiny tie-breaker so 0p oGCDs are strictly preferred over costly heals!
+                res_pen = (res_pot / max(1.0, self.kit.filler_gcd_potency)) * 0.15
+                burst_extra = (0.04 if (sk.is_gcd and self.kit.is_in_burst(self.t)) else 0.0)
+                reward -= (res_pen + burst_extra + sk.dps_cost * 0.03)
 
             self.action_log.append(
                 {
@@ -1326,6 +1332,8 @@ def replay_plan(
 
     scheduled = sorted(plan.actions, key=lambda a: (a.cast_at_s, 0 if a.is_gcd else 1))
     ptr = 0
+    executed_count = 0
+    dropped_count = 0
 
     while engine.t < timeline.duration_s - EPS and not engine.died:
         # Execute any planned actions due at or before current t
@@ -1333,19 +1341,26 @@ def replay_plan(
         while ptr < len(scheduled) and scheduled[ptr].cast_at_s <= engine.t + EPS:
             act = scheduled[ptr]
             aidx = idx_by_key.get((act.skill_id, act.target_channel), idx_by_skill.get(act.skill_id, 0))
+            sk = next((s for s in kit.skills if s.id == act.skill_id), None)
+            if aidx < 2 or sk is None:
+                ptr += 1
+                dropped_count += 1
+                continue
+            # Check strict timing deadline BEFORE attempting execution so an on-cooldown cast never silently slides by 5s+!
+            if engine.t > act.cast_at_s + 2.5:
+                ptr += 1
+                dropped_count += 1
+                continue
             mask = engine.action_mask()
             if mask[aidx]:
                 engine.execute_action(aidx)
                 ptr += 1
+                executed_count += 1
                 acted = True
             else:
-                # If skill is permanently impossible here (e.g. downtime boss debuff), drop; else wait for anim/gcd
-                sk = next((s for s in kit.skills if s.id == act.skill_id), None)
-                if sk is not None and sk.needs_boss_target() and not timeline.is_boss_targetable(engine.t):
+                if sk.needs_boss_target() and not timeline.is_boss_targetable(engine.t):
                     ptr += 1
-                    continue
-                if engine.t > act.event_time_s + 0.5:
-                    ptr += 1
+                    dropped_count += 1
                     continue
                 break
 
@@ -1372,4 +1387,10 @@ def replay_plan(
             next_t = min(timeline.duration_s, engine.t + 0.05)
         engine.advance_to(next_t)
 
-    return engine.build_verification()
+    if not engine.died and ptr < len(scheduled):
+        dropped_count += len(scheduled) - ptr
+
+    ver = engine.build_verification()
+    ver.executed_actions = executed_count
+    ver.dropped_actions = dropped_count
+    return ver

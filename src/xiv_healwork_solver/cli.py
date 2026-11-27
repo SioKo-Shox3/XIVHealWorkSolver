@@ -11,11 +11,12 @@ from rich.console import Console
 from rich.table import Table
 
 from xiv_healwork_solver.colab.robustness_sim import run_robustness_simulation
+from xiv_healwork_solver.exporter.audit import audit_healwork_sheet, render_audit_markdown
 from xiv_healwork_solver.exporter.sheets import export_csv, export_json, export_markdown
 from xiv_healwork_solver.fflogs.client import FFLogsClient
 from xiv_healwork_solver.fflogs.dataset import build_curated_encounter_timeline
 from xiv_healwork_solver.fflogs.extractor import extract_damage_timeline
-from xiv_healwork_solver.models import EncounterTimeline, LiveFightState, ObjectivePreset, PlayerKit
+from xiv_healwork_solver.models import EncounterTimeline, LiveFightState, ObjectivePreset, OptimizationPlan, PlayerKit
 from xiv_healwork_solver.optimizer.solver import replan_from_state, solve_mitigation_plan
 
 app = typer.Typer(help="Skill-agnostic FF14 mitigation & healing timeline solver.")
@@ -74,12 +75,13 @@ def optimize(
     kit_path: Path = typer.Option(..., "--kit", "-k", help="Path to player skill kit YAML"),
     timeline_path: Path = typer.Option(..., "--timeline", "-t", help="Path to encounter timeline YAML"),
     preset: ObjectivePreset = typer.Option("balanced", "--preset", "-p", help="balanced|dps_greedy|safe|solo_carry"),
+    ilvl: Optional[int] = typer.Option(None, "--ilvl", help="Optional average iLvl override (auto-scales HP & heal power)"),
     partner_trust: Optional[float] = typer.Option(None, "--partner-trust", help="Override partner trust [0.0..1.0]"),
     out_dir: Optional[Path] = typer.Option(None, "--out-dir", "-o", help="Export Markdown, CSV, and JSON to directory"),
     simulate_trials: int = typer.Option(2000, "--sim-trials", help="Local Monte Carlo trials (0 to skip)"),
 ) -> None:
     """Solve an optimal mitigation & healing timeline for a skill kit and encounter."""
-    kit = PlayerKit.from_yaml(kit_path)
+    kit = PlayerKit.from_yaml(kit_path).with_gear_overrides(ilvl=ilvl)
     timeline = EncounterTimeline.from_yaml(timeline_path)
     plan = solve_mitigation_plan(kit, timeline, preset=preset, partner_trust_override=partner_trust)
     _print_plan_table(plan)
@@ -244,15 +246,17 @@ def infer_rl(
     checkpoint: Path = typer.Option(..., "--checkpoint", "-m", help="Path to trained best_policy.pt"),
     kit_path: Path = typer.Option(..., "--kit", "-k", help="Path to base PlayerKit YAML"),
     timeline_path: Path = typer.Option(..., "--timeline", "-t", help="Path to EncounterTimeline YAML"),
+    ilvl: Optional[int] = typer.Option(None, "--ilvl", help="Average iLvl (e.g. 770 Week-1 -> 790 BiS; auto-scales HP & heal)"),
     gcd_s: Optional[float] = typer.Option(None, "--gcd", help="Override GCD seconds (e.g. 2.42)"),
     piety: Optional[int] = typer.Option(None, "--piety", help="Override Piety stat (e.g. 950)"),
     tenacity: Optional[int] = typer.Option(None, "--tenacity", help="Override Tenacity stat"),
     heal_scale: Optional[float] = typer.Option(None, "--heal-scale", help="Override heal/shield multiplier"),
     max_hp_party: Optional[float] = typer.Option(None, "--hp-party", help="Override party max HP"),
     max_hp_tank: Optional[float] = typer.Option(None, "--hp-tank", help="Override tank max HP"),
+    min_hp_margin: float = typer.Option(0.0, "--min-hp-margin", help="Minimum worst-case HP ratio floor (e.g. 0.05 = 5%)"),
     pulls: int = typer.Option(12, "--pulls", help="Evaluation pulls across 3s server-tick phases"),
 ) -> None:
-    """Run a pre-trained gear-conditioned RL checkpoint with custom runtime gear parameters."""
+    """Run a pre-trained gear/iLvl-conditioned RL checkpoint with custom runtime gear parameters."""
     from xiv_healwork_solver.rl.train_colab import infer_with_gear
 
     kit = PlayerKit.from_yaml(kit_path)
@@ -261,17 +265,52 @@ def infer_rl(
         checkpoint_path=checkpoint,
         kit=kit,
         timeline=timeline,
+        ilvl=ilvl,
         gcd_s=gcd_s,
         piety=piety,
         tenacity=tenacity,
         heal_scale=heal_scale,
         max_hp_party=max_hp_party,
         max_hp_tank=max_hp_tank,
+        min_hp_margin_ratio=min_hp_margin,
         n_eval_pulls=pulls,
     )
-    summary = {k: v for k, v in res.items() if k != "deterministic_action_log"}
+    summary = {k: v for k, v in res.items() if k not in ("deterministic_action_log", "verified_plan")}
     console.print(f"[bold cyan]RL Inference Result:[/bold cyan] {json.dumps(summary, ensure_ascii=False)}")
     console.print(f"Scheduled actions (deterministic rollout): {len(res['deterministic_action_log'])}")
+
+
+@app.command("audit-sheet")
+def audit_sheet(
+    plan_path: Path = typer.Option(..., "--plan", "-p", help="Path to exported OptimizationPlan JSON"),
+    kit_path: Path = typer.Option(..., "--kit", "-k", help="Path to PlayerKit YAML"),
+    timeline_path: Path = typer.Option(..., "--timeline", "-t", help="Path to EncounterTimeline YAML"),
+    ilvl: Optional[int] = typer.Option(None, "--ilvl", help="Optional iLvl override matching the plan"),
+    ref_casts: list[Path] = typer.Option([], "--ref-casts", "-r", help="Reference real FFLogs clear cast JSON(s)"),
+    out: Optional[Path] = typer.Option(None, "--out", "-o", help="Optional output Markdown audit report path"),
+) -> None:
+    """Audit a generated healwork sheet for 100% survival, legality, and realism vs real FFLogs clears."""
+    kit = PlayerKit.from_yaml(kit_path).with_gear_overrides(ilvl=ilvl)
+    timeline = EncounterTimeline.from_yaml(timeline_path)
+    raw = json.loads(plan_path.read_text(encoding="utf-8"))
+    plan = OptimizationPlan.model_validate(raw["verified_plan"] if "verified_plan" in raw else raw)
+
+    ref_lists: list[list[dict]] = []
+    ref_labels: list[str] = []
+    for rp in ref_casts:
+        data = json.loads(rp.read_text(encoding="utf-8"))
+        casts = data["actions"] if isinstance(data, dict) and "actions" in data else data
+        if isinstance(casts, list):
+            ref_lists.append(casts)
+            ref_labels.append(rp.stem)
+
+    report = audit_healwork_sheet(
+        kit, timeline, plan, reference_clear_casts=ref_lists, reference_clear_labels=ref_labels
+    )
+    md = render_audit_markdown(report, output_path=out)
+    console.print(md)
+    if out is not None:
+        console.print(f"[green]Saved audit report -> {out}[/green]")
 
 
 @app.command("check-fflogs")

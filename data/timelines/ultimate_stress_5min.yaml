@@ -1,0 +1,204 @@
+# Synthetic 5-minute Ultimate-style stress timeline for multi-encounter RL & verification
+# Covers ALL Ultimate mechanics:
+#   - Pre-pull barrier check (opener raidwide)
+#   - Heavy continuous tank AA & MT/ST swap
+#   - Set-HP-to-1 + Full-Heal Doom check
+#   - Cleansable Esuna debuff check
+#   - Untargetable downtime window (free pre-shields, boss debuffs disabled)
+#   - HpThresholdTrigger (full-heal-triggered raidwide blast, must resolve before expiry!)
+encounter_name: "Ultimate Stress Arena (5min)"
+zone_name: "Synthetic Ultimate Benchmark"
+duration_s: 300.0
+
+events:
+  - id: ult_opener_rw
+    time_s: 12.0
+    name: "Opening Calamity"
+    damage_type: magical
+    target_scope: party
+    raw_damage: 195000.0
+    is_major: true
+
+  - id: ult_tb_1
+    time_s: 32.0
+    name: "Executioner Cleave"
+    damage_type: physical
+    target_scope: mt
+    raw_damage: 340000.0
+    is_major: true
+
+  - id: ult_esuna_hit
+    time_s: 55.0
+    name: "Venomous Gaze"
+    damage_type: magical
+    target_scope: mt
+    raw_damage: 110000.0
+    esuna_required_count: 1
+    esuna_deadline_s: 10.0
+    is_major: true
+
+  - id: ult_rw_dot
+    time_s: 78.0
+    name: "Abyssal Burn"
+    damage_type: magical
+    target_scope: party
+    raw_damage: 160000.0
+    dot_total_damage: 120000.0
+    dot_duration_s: 15.0
+    is_major: true
+
+  - id: ult_hp1_doom
+    time_s: 118.0
+    name: "White Hole Doom"
+    damage_type: special
+    target_scope: party
+    raw_damage: 0.0
+    mechanic_effect: set_hp_to_1
+    doom_full_heal_duration_s: 10.0
+    is_major: true
+
+  - id: ult_post_dt_blast
+    time_s: 162.0
+    name: "Phase Transition Ultimate"
+    damage_type: magical
+    target_scope: party
+    raw_damage: 245000.0
+    is_major: true
+
+  - id: ult_fairy_prep
+    time_s: 190.0
+    name: "Fae Radiance Pulse"
+    damage_type: magical
+    target_scope: party
+    raw_damage: 135000.0
+    is_major: true
+
+  - id: ult_double_tb
+    time_s: 230.0
+    name: "Twin Sovereign Buster"
+    damage_type: physical
+    target_scope: both_tanks
+    raw_damage: 310000.0
+    is_major: true
+
+  - id: ult_multi_stack
+    time_s: 258.0
+    name: "Final Chorus (4-hit)"
+    damage_type: magical
+    target_scope: party
+    raw_damage: 260000.0
+    hit_count: 4
+    hit_interval_s: 1.5
+    is_major: true
+
+  - id: ult_enrage_check
+    time_s: 285.0
+    name: "Last Testament"
+    damage_type: magical
+    target_scope: party
+    raw_damage: 215000.0
+    is_major: true
+
+downtime_windows:
+  - start_s: 142.0
+    end_s: 159.0
+    boss_targetable: false
+    party_can_act: true
+    reason: "Trio Mechanics Downtime (free pre-shields)"
+
+movement_windows:
+  - start_s: 42.0
+    end_s: 50.0
+    reason: "Spread/Dodge sequence"
+  - start_s: 240.0
+    end_s: 248.0
+    reason: "Towers movement"
+
+auto_attacks:
+  - start_s: 4.0
+    end_s: 141.0
+    interval_s: 3.0
+    raw_damage_per_hit: 36000.0
+    damage_type: physical
+    target_scope: mt
+  - start_s: 163.0
+    end_s: 296.0
+    interval_s: 3.0
+    raw_damage_per_hit: 38000.0
+    damage_type: physical
+    target_scope: st
+
+hp_trigger_mechanics:
+  - id: fae_dance_full_heal_blast
+    name: "Fae Dance Full-Heal Discharge"
+    start_s: 192.0
+    end_s: 216.0
+    watch_channel: party
+    trigger_hp_ratio: 0.995
+    blast_target_scope: party
+    blast_raw_damage: 170000.0
+    blast_damage_type: magical
+    max_triggers: 1
+    trigger_cooldown_s: 2.0
+    must_trigger_before_end: true
+
+partner_profile:
+  - event_id: ult_opener_rw
+    skill_name: "Reprisal + Addle"
+    mitigation_all: 0.10
+    mitigation_magical: 0.10
+    probability: 0.90
+  - event_id: ult_opener_rw
+    skill_name: "Co-healer AoE Heal"
+    heal_value: 55000.0
+    timing_mean_offset_s: 2.0
+    probability: 1.0
+  - event_id: ult_tb_1
+    skill_name: "MT Personal Mit (40%)"
+    mitigation_all: 0.40
+    probability: 1.0
+  - event_id: ult_double_tb
+    skill_name: "Tank Personal Mit (40%)"
+    mitigation_all: 0.40
+    probability: 1.0
+  - event_id: ult_rw_dot
+    skill_name: "Co-healer Regen + Mit"
+    mitigation_all: 0.10
+    heal_value: 50000.0
+    timing_mean_offset_s: 3.0
+    probability: 0.95
+  - event_id: ult_hp1_doom
+    skill_name: "Co-healer Benediction/Macro"
+    heal_value: 145000.0
+    timing_mean_offset_s: 1.5
+    probability: 1.0
+  - event_id: ult_post_dt_blast
+    skill_name: "Tank Party Mit + Co-healer"
+    mitigation_all: 0.15
+    shield_value: 20000.0
+    heal_value: 60000.0
+    timing_mean_offset_s: 2.5
+    probability: 0.95
+  - event_id: ult_fairy_prep
+    skill_name: "Co-healer Top-up"
+    mitigation_all: 0.10
+    heal_value: 40000.0
+    timing_mean_offset_s: 3.0
+    probability: 0.90
+  - event_id: ult_multi_stack
+    skill_name: "Party Mit + Co-healer"
+    mitigation_all: 0.15
+    heal_value: 90000.0
+    timing_mean_offset_s: 2.5
+    probability: 0.95
+  - event_id: ult_enrage_check
+    skill_name: "Reprisal + Co-healer"
+    mitigation_all: 0.10
+    heal_value: 50000.0
+    timing_mean_offset_s: 2.0
+    probability: 0.90
+
+partner_baseline_healing:
+  party_per_3s_tick: 12000.0
+  mt_per_3s_tick: 18000.0
+  st_per_3s_tick: 18000.0

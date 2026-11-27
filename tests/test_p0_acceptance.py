@@ -1263,6 +1263,201 @@ def test_codex_hp_trigger_and_potency_p1_regressions():
     assert eng.stats["hp_triggers_fired"] == 1.0  # Still 1, NOT 2!
 
 
+def test_ilvl_progression_scaling_raises_expected_dps_at_100pct_survival():
+    """Higher iLvl raises Max HP and heal_scale, enabling fewer GCD heals and higher Expected DPS at 100% survival."""
+    from xiv_healwork_solver.models import OptimizationPlan, PlannedAction
+    from xiv_healwork_solver.sim.safety import maximize_dps_at_100pct_survival
+
+    kit_base = PlayerKit(
+        label="iLvl Test Healer",
+        role="healer",
+        reference_ilvl=780,
+        gcd_s=2.40,
+        max_hp_party=160_000,
+        max_hp_tank=250_000,
+        filler_gcd_potency=310.0,
+        skills=[
+            SkillDef(
+                id="gcd_shield",
+                name="GCD Shield",
+                cooldown_s=2.4,
+                duration_s=30.0,
+                is_gcd=True,
+                weave_cost=0,
+                target_scope="party",
+                shield_value=24_000,
+                heal_instant=12_000,
+            ),
+            SkillDef(
+                id="ogcd_hot",
+                name="oGCD HoT",
+                cooldown_s=60.0,
+                duration_s=15.0,
+                is_gcd=False,
+                weave_cost=1,
+                target_scope="party",
+                heal_hot_total=20_000,
+            ),
+        ],
+    )
+    k_low = kit_base.with_gear_overrides(ilvl=770)
+    k_high = kit_base.with_gear_overrides(ilvl=795)
+    assert k_low.max_hp_party < kit_base.max_hp_party < k_high.max_hp_party
+    assert k_low.gear_stats.heal_scale_multiplier < 1.0 < k_high.gear_stats.heal_scale_multiplier
+    # Explicit HP override wins over iLvl-derived default
+    k_override = kit_base.with_gear_overrides(ilvl=790, max_hp_party=199_999.0)
+    assert k_override.max_hp_party == pytest.approx(199_999.0)
+
+    # 158k raw raidwide: +5% roll = 165.9k -> i770 (HP ~148.8k) NEEDS the GCD shield (171.5k), while i795 (HP ~178.4k) survives WITHOUT it!
+    tl = EncounterTimeline(
+        encounter_name="iLvl DPS Scaling Check",
+        duration_s=25.0,
+        events=[DamageEvent(id="e1", time_s=12.0, name="Big Raidwide", raw_damage=158_000)],
+    )
+    seed_plan = OptimizationPlan(
+        encounter_name=tl.encounter_name,
+        kit_label=kit_base.label,
+        preset="balanced",
+        partner_trust=1.0,
+        status="seed",
+        objective_value=0.0,
+        actions=[
+            PlannedAction(
+                event_id="e1", event_name="Big Raidwide", event_time_s=12.0, cast_at_s=8.0,
+                skill_id="gcd_shield", skill_name="GCD Shield", target_scope="party",
+                target_channel="party", is_gcd=True, weave_cost=0,
+            )
+        ],
+        evaluations=[],
+    )
+    _, rep_low, _ = maximize_dps_at_100pct_survival(k_low, tl, seed_plan, damage_roll=1.05, n_phases=6)
+    _, rep_high, stats_high = maximize_dps_at_100pct_survival(k_high, tl, seed_plan, damage_roll=1.05, n_phases=6)
+    assert rep_low.survival_rate_pct == 100.0 and rep_low.mean_gcd_heals >= 1.0
+    assert rep_high.survival_rate_pct == 100.0 and rep_high.mean_gcd_heals == 0.0
+    assert stats_high["pruned"] >= 1
+    assert rep_high.mean_expected_potency > rep_low.mean_expected_potency
+
+
+def test_dropped_action_tracking_prevents_on_cooldown_ghost_swaps_and_sheet_audit():
+    """Verify replay_plan tracks dropped_actions, DPS maximizer strips ghost/illegal casts, and audit_healwork_sheet flags issues."""
+    from xiv_healwork_solver.exporter.audit import audit_healwork_sheet, render_audit_markdown
+    from xiv_healwork_solver.models import OptimizationPlan, PlannedAction
+    from xiv_healwork_solver.sim.engine import replay_plan
+    from xiv_healwork_solver.sim.safety import maximize_dps_at_100pct_survival
+
+    kit = PlayerKit(
+        label="Ghost Swap Regression Kit",
+        role="healer",
+        gcd_s=2.40,
+        burst_weave_slots_per_gcd=1,
+        max_hp_party=150_000,
+        max_hp_tank=240_000,
+        skills=[
+            SkillDef(
+                id="cd60_hot",
+                name="60s HoT",
+                cooldown_s=60.0,
+                duration_s=15.0,
+                is_gcd=False,
+                weave_cost=1,
+                target_scope="party",
+                heal_hot_total=30_000,
+            ),
+            SkillDef(
+                id="costly_aoe",
+                name="Costly AoE",
+                cooldown_s=30.0,
+                duration_s=0.0,
+                is_gcd=True,
+                weave_cost=0,
+                target_scope="party",
+                heal_instant=25_000,
+            ),
+        ],
+    )
+    tl = EncounterTimeline(
+        encounter_name="Ghost Audit Arena",
+        duration_s=45.0,
+        events=[
+            DamageEvent(id="e1", time_s=10.0, name="Hit 1", raw_damage=60_000),
+            DamageEvent(id="e2", time_s=30.0, name="Hit 2", raw_damage=60_000),
+        ],
+    )
+    # Schedule cd60_hot TWICE within 12s (2nd cast is illegal on-cooldown!)
+    ghost_plan = OptimizationPlan(
+        encounter_name=tl.encounter_name,
+        kit_label=kit.label,
+        preset="balanced",
+        partner_trust=1.0,
+        status="noisy",
+        objective_value=0.0,
+        actions=[
+            PlannedAction(
+                event_id="e1", event_name="Hit 1", event_time_s=10.0, cast_at_s=8.0,
+                skill_id="cd60_hot", skill_name="60s HoT", target_scope="party",
+                target_channel="party", is_gcd=False, weave_cost=1,
+            ),
+            PlannedAction(
+                event_id="e2", event_name="Hit 2", event_time_s=30.0, cast_at_s=20.0,
+                skill_id="cd60_hot", skill_name="60s HoT", target_scope="party",
+                target_channel="party", is_gcd=False, weave_cost=1,
+            ),
+        ],
+        evaluations=[],
+    )
+    rep_raw = replay_plan(kit, tl, ghost_plan, deterministic=True, fixed_tick_phase=1.5, forced_damage_roll=1.05)
+    assert rep_raw.dropped_actions == 1
+
+    # Audit catches the dropped ghost cast as FAIL!
+    audit_bad = audit_healwork_sheet(kit, tl, ghost_plan, reference_clear_casts=[[{"skill_id": "cd60_hot"}]], reference_clear_labels=["Ref#1"])
+    assert audit_bad.verdict == "FAIL"
+    assert any(f.category == "legality" for f in audit_bad.findings)
+
+    # maximize_dps_at_100pct_survival cleans the ghost cast cleanly -> 0 dropped actions & PASS audit!
+    clean_plan, clean_rep, stats = maximize_dps_at_100pct_survival(kit, tl, ghost_plan, damage_roll=1.05, n_phases=6)
+    assert clean_rep.max_dropped_actions == 0
+    assert stats["ghosts_removed"] >= 1
+    audit_ok = audit_healwork_sheet(kit, tl, clean_plan, reference_clear_casts=[[{"skill_id": "cd60_hot"}]], reference_clear_labels=["Ref#1"])
+    assert audit_ok.verdict in ("PASS", "WARN")
+    assert audit_ok.stress_105.max_dropped_actions == 0
+    md = render_audit_markdown(audit_ok)
+    assert "シート検品レポート" in md and "Ref#1" in md
+
+
+def test_multi_encounter_parallel_rl_trainer_smoke(tmp_path):
+    """Verify multi-encounter train_masked_ppo works cleanly with parallel CPU rollout workers."""
+    pytest.importorskip("torch")
+    from xiv_healwork_solver.rl.train_colab import train_masked_ppo
+
+    kit = PlayerKit.from_yaml(ROOT / "data" / "kits" / "example_barrier_healer.yaml")
+    tl1 = EncounterTimeline(
+        encounter_name="Mini Enc 1",
+        duration_s=24.0,
+        events=[DamageEvent(id="e1", time_s=12.0, name="Blast", raw_damage=55_000)],
+    )
+    tl2 = EncounterTimeline(
+        encounter_name="Mini Enc 2",
+        duration_s=24.0,
+        events=[DamageEvent(id="e1", time_s=10.0, name="Wave", raw_damage=60_000)],
+    )
+    summary = train_masked_ppo(
+        kit=kit,
+        timeline=tl1,
+        extra_timelines=[tl2],
+        updates=2,
+        episodes_per_update=4,
+        hidden_dim=32,
+        ppo_epochs=2,
+        minibatch_size=32,
+        num_workers=2,
+        out_dir=tmp_path / "rl_multi",
+    )
+    assert summary["updates"] == 2
+    assert len(summary["trained_encounters"]) == 2
+    assert (tmp_path / "rl_multi" / "best_policy.pt").exists()
+
+
+
 
 
 

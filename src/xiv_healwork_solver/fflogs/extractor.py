@@ -153,6 +153,10 @@ def extract_damage_timeline(
         ev_type = ev.get("type")
         if ev_type not in ("damage", "calculateddamage"):
             continue
+        # Ignore friendly self-damage effects (e.g., Gunbreaker Superbolide HP-to-1 self-hit!)
+        src_id = ev.get("sourceID")
+        if src_id is not None and int(src_id) in actors_by_id and actors_by_id[int(src_id)].get("type") == "Player":
+            continue
         rel_s = (float(ev["timestamp"]) - fight_start_ms) / 1000.0
         if rel_s < 0:
             continue
@@ -252,6 +256,7 @@ def extract_damage_timeline(
 
     consumed_dot_indices: set[int] = set()
     events: list[DamageEvent] = []
+    event_all_targets: list[set[int]] = []
     event_nontank_targets: list[set[int]] = []
     for idx, cl in enumerate(clusters, start=1):
         unique_targets = {int(x["target_id"]) for x in cl if x["target_id"] is not None}
@@ -313,18 +318,19 @@ def extract_damage_timeline(
             dot_total_damage=round(dot_per_target, 1),
         )
 
-        # Merge simultaneous disjoint-target split-party mechanics (e.g. Spread on group A + Lash on group B within 2.0s)
-        # so the single `party` channel is not hit twice by mutually exclusive mechanics!
+        # Merge simultaneous or alternating disjoint-target split-party mechanics (e.g. Group A hit then
+        # Group B hit within 5.5s with ZERO overlapping targets across both tanks and non-tanks, and no DoT loss)
+        # so the single `party` channel is never hit twice by mutually exclusive mechanics!
         merged_disjoint = False
-        if scope == "party" and nontank_targets:
+        if scope == "party" and nontank_targets and cand.dot_total_damage <= 0.0:
             for prev_i in range(len(events) - 1, -1, -1):
                 prev_ev = events[prev_i]
-                if cand.time_s - prev_ev.time_s > 2.0:
+                if cand.time_s - prev_ev.time_s > 5.5:
                     break
                 if (
                     prev_ev.target_scope == "party"
                     and event_nontank_targets[prev_i]
-                    and event_nontank_targets[prev_i].isdisjoint(nontank_targets)
+                    and event_all_targets[prev_i].isdisjoint(unique_targets)
                 ):
                     if cand.raw_damage > prev_ev.raw_damage:
                         events[prev_i] = prev_ev.model_copy(
@@ -335,12 +341,14 @@ def extract_damage_timeline(
                         )
                     elif cand.name != prev_ev.name and cand.name not in prev_ev.name:
                         events[prev_i] = prev_ev.model_copy(update={"name": f"{prev_ev.name} / {cand.name}"})
+                    event_all_targets[prev_i] |= unique_targets
                     event_nontank_targets[prev_i] |= nontank_targets
                     merged_disjoint = True
                     break
 
         if not merged_disjoint:
             events.append(cand)
+            event_all_targets.append(set(unique_targets))
             event_nontank_targets.append(set(nontank_targets))
 
     # Preserve standalone / differently-IDed DoTs as their own events so bleeds never vanish

@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 DamageType = Literal["physical", "magical", "special"]
 SkillTargetScope = Literal["party", "self", "single_ally", "mt", "st", "boss_debuff"]
@@ -36,6 +36,11 @@ class LevelStatConstants(BaseModel):
 class GearStats(BaseModel):
     """Player gear & substat parameters that affect mitigation, healing, and MP economy."""
 
+    item_level: int | None = Field(
+        default=None,
+        ge=1,
+        description="Optional average item level (e.g. 770 Week-1 -> 790 BiS) for automatic tier HP/heal scaling",
+    )
     tenacity: int = Field(default=420, ge=0, description="Tank Tenacity (TEN) -> passive mitigation")
     piety: int = Field(default=440, ge=0, description="Healer Piety (PIE) -> combat MP regen per 3s tick")
     determination: int = Field(default=2000, ge=0, description="Determination (DET)")
@@ -256,18 +261,32 @@ class PrePullAction(BaseModel):
 
 
 class GearSamplingRange(BaseModel):
-    """Optional parameter ranges for gear-conditioned RL training (so one model adapts to any gear input)."""
+    """Optional parameter ranges for gear/iLvl-conditioned RL training (Week-1 crafted -> BiS)."""
 
-    gcd_min: float = 2.28
-    gcd_max: float = 2.50
-    piety_min: int = 440
-    piety_max: int = 1600
-    tenacity_min: int = 420
-    tenacity_max: int = 2200
-    heal_scale_min: float = 0.90
-    heal_scale_max: float = 1.15
-    hp_scale_min: float = 0.92
-    hp_scale_max: float = 1.12
+    gcd_min: float = Field(default=2.28, gt=1.0, le=3.5)
+    gcd_max: float = Field(default=2.50, gt=1.0, le=3.5)
+    piety_min: int = Field(default=440, ge=0)
+    piety_max: int = Field(default=1800, ge=0)
+    tenacity_min: int = Field(default=420, ge=0)
+    tenacity_max: int = Field(default=2200, ge=0)
+    heal_scale_min: float = Field(default=0.88, gt=0.1, le=3.0)
+    heal_scale_max: float = Field(default=1.18, gt=0.1, le=3.0)
+    hp_scale_min: float = Field(default=0.88, gt=0.1, le=3.0)
+    hp_scale_max: float = Field(default=1.18, gt=0.1, le=3.0)
+
+    @model_validator(mode="after")
+    def _validate_bounds(self) -> "GearSamplingRange":
+        pairs = (
+            ("gcd", self.gcd_min, self.gcd_max),
+            ("piety", self.piety_min, self.piety_max),
+            ("tenacity", self.tenacity_min, self.tenacity_max),
+            ("heal_scale", self.heal_scale_min, self.heal_scale_max),
+            ("hp_scale", self.hp_scale_min, self.hp_scale_max),
+        )
+        for name, lo, hi in pairs:
+            if lo > hi:
+                raise ValueError(f"{name}_min ({lo}) must be <= {name}_max ({hi})")
+        return self
 
 
 class PlayerKit(BaseModel):
@@ -276,6 +295,23 @@ class PlayerKit(BaseModel):
     label: str
     role: RoleType = "healer"
     player_is_mt: bool = True
+    reference_ilvl: int = Field(
+        default=780,
+        ge=1,
+        description="Reference iLvl at which max_hp_party, max_hp_tank, and heal_scale_multiplier=1.0 are calibrated",
+    )
+    ilvl_hp_per_10: float = Field(
+        default=0.075,
+        ge=0.0,
+        le=0.5,
+        description="Fractional Max HP growth per +10 iLvl (e.g. 0.075 = +7.5% HP per +10 iLvl)",
+    )
+    ilvl_heal_per_10: float = Field(
+        default=0.060,
+        ge=0.0,
+        le=0.5,
+        description="Fractional heal/shield potency growth per +10 iLvl (e.g. 0.060 = +6.0% per +10 iLvl)",
+    )
     gcd_s: float = Field(default=2.50, gt=1.0, le=3.5)
     base_weave_slots_per_gcd: int = Field(default=1, ge=0, le=2)
     burst_interval_s: float = Field(default=120.0, gt=0.0)
@@ -412,6 +448,52 @@ class PlayerKit(BaseModel):
                 )
             )
         return pools
+
+    def with_gear_overrides(
+        self,
+        *,
+        ilvl: int | None = None,
+        gcd_s: float | None = None,
+        piety: int | None = None,
+        tenacity: int | None = None,
+        heal_scale: float | None = None,
+        max_hp_party: float | None = None,
+        max_hp_tank: float | None = None,
+    ) -> "PlayerKit":
+        """Return a deep copy with runtime gear / iLvl progression applied cleanly.
+
+        When `ilvl` is specified, scales Max HP and `heal_scale_multiplier` smoothly relative to
+        `reference_ilvl` (e.g. Week-1 crafted i770 -> Mid-tier i780 -> BiS i790). Explicit
+        `max_hp_party`, `max_hp_tank`, or `heal_scale` arguments always override the iLvl-derived values.
+        """
+        kit_copy = self.model_copy(deep=True)
+        if ilvl is not None:
+            if ilvl < 1 or ilvl > 2000:
+                raise ValueError(f"ilvl must be within [1, 2000], got {ilvl}")
+            # Scale relative to current item_level (if already scaled) or reference_ilvl so repeated calls are idempotent!
+            prev_ilvl = kit_copy.gear_stats.item_level if kit_copy.gear_stats.item_level is not None else kit_copy.reference_ilvl
+            delta_tiers = max(-10.0, min(10.0, (float(ilvl) - float(prev_ilvl)) / 10.0))
+            hp_factor = max(0.5, (1.0 + kit_copy.ilvl_hp_per_10) ** delta_tiers)
+            heal_factor = max(0.5, (1.0 + kit_copy.ilvl_heal_per_10) ** delta_tiers)
+            kit_copy.gear_stats.item_level = ilvl
+            kit_copy.max_hp_party = round(kit_copy.max_hp_party * hp_factor, 0)
+            kit_copy.max_hp_tank = round(kit_copy.max_hp_tank * hp_factor, 0)
+            kit_copy.gear_stats.heal_scale_multiplier = round(
+                kit_copy.gear_stats.heal_scale_multiplier * heal_factor, 3
+            )
+        if gcd_s is not None:
+            kit_copy.gcd_s = gcd_s
+        if piety is not None:
+            kit_copy.gear_stats.piety = piety
+        if tenacity is not None:
+            kit_copy.gear_stats.tenacity = tenacity
+        if heal_scale is not None:
+            kit_copy.gear_stats.heal_scale_multiplier = heal_scale
+        if max_hp_party is not None:
+            kit_copy.max_hp_party = max_hp_party
+        if max_hp_tank is not None:
+            kit_copy.max_hp_tank = max_hp_tank
+        return PlayerKit.model_validate(kit_copy.model_dump())
 
     @classmethod
     def from_yaml(cls, path: str | Path) -> "PlayerKit":
@@ -737,6 +819,8 @@ class ReplayVerification(BaseModel):
     resource_potency_lost: float = 0.0
     dps_efficiency_pct: float = 100.0
     hp_triggers_fired: int = 0
+    executed_actions: int = 0
+    dropped_actions: int = 0
     event_snapshots: list[ReplayEventSnapshot] = Field(default_factory=list)
 
 

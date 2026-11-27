@@ -31,6 +31,7 @@ class StressTestReport:
     mean_potency_lost: float = 0.0
     mean_dps_efficiency_pct: float = 100.0
     hp_triggers_fired: int = 0
+    max_dropped_actions: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -49,7 +50,53 @@ class StressTestReport:
             "mean_potency_lost": self.mean_potency_lost,
             "mean_dps_efficiency_pct": self.mean_dps_efficiency_pct,
             "hp_triggers_fired": self.hp_triggers_fired,
+            "max_dropped_actions": self.max_dropped_actions,
         }
+
+
+def canonicalize_plan_actions(
+    kit: PlayerKit,
+    timeline: EncounterTimeline,
+    plan: OptimizationPlan,
+) -> OptimizationPlan:
+    """Normalize target_channel, target_scope, action_id, and covered event label for clean sheet output."""
+    skills_by_id = {sk.id: sk for sk in kit.skills}
+    events_sorted = sorted(timeline.events, key=lambda e: e.time_s)
+    fixed: list[PlannedAction] = []
+    for i, act in enumerate(sorted(plan.actions, key=lambda a: (a.cast_at_s, 0 if a.is_gcd else 1))):
+        sk = skills_by_id.get(act.skill_id)
+        if sk is None:
+            continue
+        ch = act.target_channel
+        if sk.target_scope == "boss_debuff":
+            ch = "boss"
+        elif sk.target_scope == "party":
+            ch = "party"
+        elif sk.target_scope == "self":
+            ch = "mt" if kit.player_is_mt else "st"
+        elif sk.target_scope == "single_ally" and ch not in ("mt", "st"):
+            ch = "mt"
+        elif sk.target_scope in ("mt", "st"):
+            ch = sk.target_scope
+
+        sc = "boss_debuff" if ch == "boss" else ch
+        nxt = next((e for e in events_sorted if e.time_s >= act.cast_at_s - 0.5), None)
+        fixed.append(
+            act.model_copy(
+                update={
+                    "skill_name": sk.name,
+                    "action_id": sk.action_id,
+                    "target_channel": ch,
+                    "target_scope": sc,
+                    "is_gcd": sk.is_gcd,
+                    "weave_cost": sk.weave_cost,
+                    "event_id": nxt.id if nxt is not None else f"t_{i}",
+                    "event_name": nxt.name if nxt is not None else "Auto-Attack / Upkeep",
+                    "event_time_s": nxt.time_s if nxt is not None else round(act.cast_at_s + 2.0, 2),
+                }
+            )
+        )
+    return plan.model_copy(update={"actions": fixed})
 
 
 def action_log_to_plan(
@@ -69,7 +116,11 @@ def action_log_to_plan(
         if sk is None:
             continue
         t = float(item.get("time_s", item.get("cast_at_s", 0.0)))
-        ch = str(item.get("channel", item.get("target_channel", "party")))
+        ch = str(item.get("channel", item.get("target_channel", item.get("target", "party"))))
+        if sk.target_scope == "boss_debuff":
+            ch = "boss"
+        elif sk.target_scope == "single_ally" and ch not in ("mt", "st"):
+            ch = "mt"
         sc = "boss_debuff" if ch == "boss" else ch
         nxt = next((e for e in events_sorted if e.time_s >= t - 1.0), None)
         planned.append(
@@ -129,6 +180,7 @@ def stress_test_plan(
     pot_losses: list[float] = []
     dps_effs: list[float] = []
     trig_max = 0
+    max_dropped = 0
 
     for roll in rolls:
         for i in range(n_phases):
@@ -158,6 +210,7 @@ def stress_test_plan(
             pot_losses.append(res.expected_potency_lost)
             dps_effs.append(res.dps_efficiency_pct)
             trig_max = max(trig_max, res.hp_triggers_fired)
+            max_dropped = max(max_dropped, res.dropped_actions)
 
     n = max(1, total_runs)
     return StressTestReport(
@@ -176,6 +229,7 @@ def stress_test_plan(
         mean_potency_lost=round(sum(pot_losses) / n, 1),
         mean_dps_efficiency_pct=round(sum(dps_effs) / n, 2),
         hp_triggers_fired=trig_max,
+        max_dropped_actions=max_dropped,
     )
 
 
@@ -352,18 +406,50 @@ def maximize_dps_at_100pct_survival(
       3. Shift costly casts (`> 0p`) that fall inside 2-minute raid-buff burst windows slightly outside burst.
     """
     skills_by_id = {sk.id: sk for sk in kit.skills}
-    current = plan.model_copy(deep=True)
+    current = canonicalize_plan_actions(kit, timeline, plan)
     report = stress_test_plan(kit, timeline, current, damage_roll=damage_roll, n_phases=n_phases)
-    stats = {"pruned": 0, "swapped": 0, "burst_shifted": 0}
+    stats = {"ghosts_removed": 0, "pruned": 0, "swapped": 0, "burst_shifted": 0}
     if report.survival_rate_pct < 100.0:
         return current, report, stats
 
-    def _is_safe(rep: StressTestReport) -> bool:
+    def _is_safe(rep: StressTestReport, max_allowed_drops: int = 0, floor_margin: float = min_hp_margin_ratio) -> bool:
         if rep.survival_rate_pct < 100.0:
             return False
-        if min_hp_margin_ratio > 0.0:
-            return min(rep.worst_min_hp_ratio.values()) >= min_hp_margin_ratio - 1e-4
+        if rep.max_dropped_actions > max_allowed_drops:
+            return False
+        if floor_margin > 0.0:
+            return min(rep.worst_min_hp_ratio.values()) >= floor_margin - 1e-4
         return True
+
+    # Compute safety margin BEFORE Pass 0 so ghost cleanup can never delete a useful cast and degrade the floor!
+    effective_margin = (
+        min(min_hp_margin_ratio, min(report.worst_min_hp_ratio.values()))
+        if min_hp_margin_ratio > 0.0
+        else 0.0
+    )
+
+    # Pass 0: Strip any ghost/unexecutable actions (e.g. on-cooldown duplicates in noisy raw logs)
+    if report.max_dropped_actions > 0:
+        cleaned = True
+        while cleaned and report.max_dropped_actions > 0:
+            cleaned = False
+            # Try removing later occurrences first so we remove the on-cooldown duplicate instead of the useful first cast!
+            for idx in reversed(range(len(current.actions))):
+                trial_actions = current.actions[:idx] + current.actions[idx + 1 :]
+                trial_plan = current.model_copy(update={"actions": trial_actions})
+                trial_rep = stress_test_plan(kit, timeline, trial_plan, damage_roll=damage_roll, n_phases=n_phases)
+                if (
+                    trial_rep.survival_rate_pct >= 100.0
+                    and trial_rep.max_dropped_actions < report.max_dropped_actions
+                    and (effective_margin <= 0.0 or min(trial_rep.worst_min_hp_ratio.values()) >= effective_margin - 1e-4)
+                ):
+                    current = trial_plan
+                    report = trial_rep
+                    stats["ghosts_removed"] += 1
+                    cleaned = True
+                    break
+
+    allowed_drops = report.max_dropped_actions
 
     def _dps_score(rep: StressTestReport) -> tuple[float, float, float]:
         # `mean_expected_potency` is already exact net DPS potency (filler gained - resource potency lost),
@@ -392,17 +478,18 @@ def maximize_dps_at_100pct_survival(
             trial_plan = current.model_copy(update={"actions": trial_actions})
             # Fast 1-phase pre-check before full multi-phase check
             q = replay_plan(kit, timeline, trial_plan, deterministic=True, fixed_tick_phase=0.0, forced_damage_roll=damage_roll)
-            if not q.survived:
+            if not q.survived or q.dropped_actions > allowed_drops:
                 continue
             trial_rep = stress_test_plan(kit, timeline, trial_plan, damage_roll=damage_roll, n_phases=n_phases)
-            if _is_safe(trial_rep) and _dps_score(trial_rep) > _dps_score(report):
+            if _is_safe(trial_rep, allowed_drops, effective_margin) and _dps_score(trial_rep) > _dps_score(report):
                 current = trial_plan
                 report = trial_rep
+                allowed_drops = min(allowed_drops, report.max_dropped_actions)
                 stats["pruned"] += 1
                 changed = True
                 break
 
-    # Pass 2: Downgrade remaining >0p skills to strictly cheaper unused oGCD skills (e.g. 310p GCD -> 0p oGCD)
+    # Pass 2: Downgrade remaining >0p skills to strictly cheaper unused LEGAL oGCD skills (zero dropped casts allowed!)
     cheaper_pool = sorted(
         kit.skills,
         key=lambda s: (kit.expected_skill_potency_loss(s, 0.0, False), s.dps_cost),
@@ -440,10 +527,10 @@ def maximize_dps_at_100pct_survival(
             trial_actions = current.actions[:idx] + [new_act] + current.actions[idx + 1 :]
             trial_plan = current.model_copy(update={"actions": trial_actions})
             q = replay_plan(kit, timeline, trial_plan, deterministic=True, fixed_tick_phase=0.0, forced_damage_roll=damage_roll)
-            if not q.survived:
+            if not q.survived or q.dropped_actions > allowed_drops:
                 continue
             trial_rep = stress_test_plan(kit, timeline, trial_plan, damage_roll=damage_roll, n_phases=n_phases)
-            if _is_safe(trial_rep) and _dps_score(trial_rep) > _dps_score(report):
+            if _is_safe(trial_rep, allowed_drops, effective_margin) and _dps_score(trial_rep) > _dps_score(report):
                 current = trial_plan
                 report = trial_rep
                 stats["swapped"] += 1
@@ -475,12 +562,21 @@ def maximize_dps_at_100pct_survival(
                 key=lambda a: (a.cast_at_s, 0 if a.is_gcd else 1),
             )
             trial_plan = current.model_copy(update={"actions": trial_actions})
+            q = replay_plan(kit, timeline, trial_plan, deterministic=True, fixed_tick_phase=0.0, forced_damage_roll=damage_roll)
+            if not q.survived or q.dropped_actions > allowed_drops:
+                continue
             trial_rep = stress_test_plan(kit, timeline, trial_plan, damage_roll=damage_roll, n_phases=n_phases)
-            if _is_safe(trial_rep) and _dps_score(trial_rep) > _dps_score(report):
+            if _is_safe(trial_rep, allowed_drops, effective_margin) and _dps_score(trial_rep) > _dps_score(report):
                 current = trial_plan
                 report = trial_rep
                 stats["burst_shifted"] += 1
                 break
 
-    current = current.model_copy(update={"status": "verified_100pct_max_dps"})
-    return current, report, stats
+    final_plan = canonicalize_plan_actions(kit, timeline, current)
+    final_report = stress_test_plan(kit, timeline, final_plan, damage_roll=damage_roll, n_phases=n_phases)
+    final_status = (
+        "verified_100pct_max_dps"
+        if (final_report.survival_rate_pct >= 100.0 and final_report.max_dropped_actions == 0)
+        else "unverified_dropped_or_failed"
+    )
+    return final_plan.model_copy(update={"status": final_status}), final_report, stats

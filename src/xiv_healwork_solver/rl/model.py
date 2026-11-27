@@ -53,7 +53,8 @@ class SkillAttentionActorCritic(nn.Module):
         self.wait_head = nn.Linear(hidden_dim, 1)
         self.filler_head = nn.Linear(hidden_dim, 1)
 
-        # Value head receives BOTH fused context AND legal-skill pooled embedding!
+        # Value head receives detached fused context + pooled legal-skill embedding so large early
+        # critic TD errors cannot destabilize the BC-pretrained Actor backbone on PPO Update 1.
         self.value_head = nn.Sequential(
             nn.Linear(hidden_dim * 2, hidden_dim),
             nn.SiLU(),
@@ -101,10 +102,11 @@ class SkillAttentionActorCritic(nn.Module):
         logits = torch.cat([wait_logit, filler_logit, logits[:, 2:]], dim=1)
         masked_logits = logits.masked_fill(~mask, -1e9)
 
-        # Masked mean pool of currently legal skills -> Value head knows what resources/CDs are ready
+        # Masked mean pool of currently legal skills -> Value head knows what resources/CDs are ready;
+        # detach so early critic TD errors never corrupt the BC-pretrained Actor backbone!
         mask_f = mask.float().unsqueeze(-1)
         pooled_skills = (skill_emb * mask_f).sum(dim=1) / mask_f.sum(dim=1).clamp(min=1.0)
-        value = self.value_head(torch.cat([ctx, pooled_skills], dim=-1)).squeeze(-1)
+        value = self.value_head(torch.cat([ctx, pooled_skills], dim=-1).detach()).squeeze(-1)
         return masked_logits, value
 
     def get_action_and_value(

@@ -35,6 +35,11 @@ skills:
   25754: {name: "タンク補助軽減", role_slot: tank_aux_mit, target_channel: mt, duration_s: 10.0, mitigation_all: 0.10}
   7382:  {name: "相方タンク投げバフ", role_slot: tank_external_mit, target_channel: st, duration_s: 8.0, mitigation_all: 0.20}
   16464: {name: "相方タンク投げバフ", role_slot: tank_external_mit, target_channel: st, duration_s: 8.0, mitigation_all: 0.19}
+  # Tank Invulnerabilities (PLD Hallowed / WAR Holmgang / DRK Living Dead / GNB Superbolide)
+  30:    {name: "タンク無敵 (インビン/ホルム/リビデ/ボーライド)", role_slot: tank_invuln, target_channel: mt, stack_group: tank_invuln, duration_s: 10.0, mitigation_all: 0.92}
+  43:    {name: "タンク無敵 (インビン/ホルム/リビデ/ボーライド)", role_slot: tank_invuln, target_channel: mt, stack_group: tank_invuln, duration_s: 10.0, mitigation_all: 0.92}
+  3638:  {name: "タンク無敵 (インビン/ホルム/リビデ/ボーライド)", role_slot: tank_invuln, target_channel: mt, stack_group: tank_invuln, duration_s: 10.0, mitigation_all: 0.92}
+  16152: {name: "タンク無敵 (インビン/ホルム/リビデ/ボーライド)", role_slot: tank_invuln, target_channel: mt, stack_group: tank_invuln, duration_s: 10.0, mitigation_all: 0.92}
 
   # Pure Healers (WHM / AST aggregated across jobs!)
   16536: {name: "ピュアヒラ10%全体軽減", role_slot: pure_healer_mit_10, target_channel: party, duration_s: 20.0, mitigation_all: 0.10}
