@@ -117,8 +117,11 @@ class SkillAttentionActorCritic(nn.Module):
         mask: torch.Tensor,
         action: torch.Tensor | None = None,
         deterministic: bool = False,
+        temperature: float = 1.0,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         logits, value = self.forward(state, skills, future, mask)
+        if temperature != 1.0 and temperature > 0.0:
+            logits = (logits / temperature).masked_fill(~mask, -1e9)
         dist = Categorical(logits=logits)
         if action is None:
             action = torch.argmax(logits, dim=-1) if deterministic else dist.sample()

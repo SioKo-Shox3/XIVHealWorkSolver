@@ -56,10 +56,15 @@ def _init_rollout_worker(
     ]
 
 
+# Scale factor for Critic value targets so MSE stays O(1) while GAE operates in exact reward units
+VALUE_TARGET_SCALE = 100.0
+
+
 def _run_rollout_batch(
     state_dict_cpu: dict[str, torch.Tensor],
     n_episodes: int,
     seed: int,
+    rollout_temperature: float = 1.0,
 ) -> dict[str, Any]:
     assert _WORKER_MODEL is not None and _WORKER_ENVS
     _WORKER_MODEL.load_state_dict(state_dict_cpu)
@@ -92,7 +97,9 @@ def _run_rollout_batch(
                 sk = torch.from_numpy(obs["skills"]).unsqueeze(0)
                 fu = torch.from_numpy(obs["future"]).unsqueeze(0)
                 mk = torch.from_numpy(obs["mask"]).unsqueeze(0)
-                act, lp, _, val = _WORKER_MODEL.get_action_and_value(st, sk, fu, mk)
+                act, lp, _, val = _WORKER_MODEL.get_action_and_value(
+                    st, sk, fu, mk, temperature=rollout_temperature
+                )
                 act_i = int(act.item())
                 next_obs, r, done, info = env.step(act_i)
 
@@ -103,7 +110,7 @@ def _run_rollout_batch(
                 actions_buf.append(act_i)
                 logprobs_buf.append(float(lp.item()))
                 rewards_buf.append(r)
-                values_buf.append(float(val.item()))
+                values_buf.append(float(val.item()) * VALUE_TARGET_SCALE)
                 dones_buf.append(done)
                 dts_buf.append(float(info.get("dt", 0.5)))
 
@@ -425,11 +432,17 @@ def train_masked_ppo(
     extra_bc_plans: list[list[dict[str, Any]] | None] | None = None,
     bc_bundles: list[tuple[PlayerKit, EncounterTimeline, list[dict[str, Any]]]] | None = None,
     num_workers: int = 1,
+    init_checkpoint: str | Path | None = None,
+    critic_lr: float = 1e-3,
+    critic_warmup_updates: int = 2,
+    rollout_temperature: float = 1.0,
+    target_kl: float = 0.025,
 ) -> dict[str, Any]:
     """Train gear/iLvl-conditioned SkillAttentionActorCritic with BC warm-start + KL-anchored Masked PPO.
 
     Supports multi-encounter training (`extra_timelines` + `extra_bc_plans`), explicit multi-iLvl BC
-    teacher bundles (`bc_bundles`), and parallel CPU rollout workers (`num_workers > 1`).
+    teacher bundles (`bc_bundles`), resuming/fine-tuning from `init_checkpoint`, detached Critic with
+    separate optimizer & return scaling, KL early-stopping, and parallel CPU rollout workers.
     """
     torch.manual_seed(seed)
     np.random.seed(seed)
@@ -444,8 +457,12 @@ def train_masked_ppo(
     all_timelines = [timeline] + extras
     all_bc_plans: list[list[dict[str, Any]] | None] = [bc_plan_actions] + extra_bcs
     has_any_bc = bool(bc_bundles) or any(bool(p) for p in all_bc_plans)
+
+    if init_checkpoint is not None:
+        ckpt = torch.load(init_checkpoint, map_location="cpu", weights_only=False)
+        hidden_dim = int(ckpt.get("hidden_dim", hidden_dim))
     print(
-        f"[RL] Device: {device} | GearConditioned={gear_conditioned} | BC={has_any_bc} | "
+        f"[RL] Device: {device} | GearConditioned={gear_conditioned} | BC={has_any_bc} | InitCkpt={bool(init_checkpoint)} | "
         f"Workers={num_workers} | Encounters={len(all_timelines)} ({', '.join(t.encounter_name for t in all_timelines)}) | "
         f"Kit: {kit.label}",
         flush=True,
@@ -456,7 +473,23 @@ def train_masked_ppo(
     model = SkillAttentionActorCritic(hidden_dim=hidden_dim).to(device)
     bc_anchor_model: SkillAttentionActorCritic | None = None
     bc_trained = False
-    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, eps=1e-5)
+
+    if init_checkpoint is not None:
+        model.load_state_dict(ckpt["model_state_dict"])
+        bc_trained = True
+        if bc_kl_coef > 0.0:
+            bc_anchor_model = SkillAttentionActorCritic(hidden_dim=hidden_dim).to(device)
+            bc_anchor_model.load_state_dict(model.state_dict())
+            bc_anchor_model.eval()
+            for p in bc_anchor_model.parameters():
+                p.requires_grad_(False)
+
+    # Separate Actor and Critic optimizers so large early critic TD errors never squash Actor grad-norm!
+    critic_param_ids = {id(p) for p in model.value_head.parameters()}
+    actor_params = [p for p in model.parameters() if id(p) not in critic_param_ids]
+    critic_params = list(model.value_head.parameters())
+    actor_opt = torch.optim.AdamW(actor_params, lr=lr, eps=1e-5)
+    critic_opt = torch.optim.AdamW(critic_params, lr=critic_lr, eps=1e-5)
 
     # Optional class-weighted Behavior Cloning warm-start across all encounters / iLvl teacher bundles
     if has_any_bc and bc_epochs > 0:
@@ -615,7 +648,15 @@ def train_masked_ppo(
                 for wi in range(n_w):
                     cnt = base_n + (1 if wi < rem_n else 0)
                     if cnt > 0:
-                        futs.append(pool.submit(_run_rollout_batch, state_cpu, cnt, seed + upd * 1000 + wi * 37))
+                        futs.append(
+                            pool.submit(
+                                _run_rollout_batch,
+                                state_cpu,
+                                cnt,
+                                seed + upd * 1000 + wi * 37,
+                                rollout_temperature,
+                            )
+                        )
                 for fut in futs:
                     res = fut.result()
                     states_buf.extend(res["states"])
@@ -643,7 +684,9 @@ def train_masked_ppo(
                             sk = torch.from_numpy(obs["skills"]).unsqueeze(0).to(device)
                             fu = torch.from_numpy(obs["future"]).unsqueeze(0).to(device)
                             mk = torch.from_numpy(obs["mask"]).unsqueeze(0).to(device)
-                            act, lp, _, val = model.get_action_and_value(st, sk, fu, mk)
+                            act, lp, _, val = model.get_action_and_value(
+                                st, sk, fu, mk, temperature=rollout_temperature
+                            )
                             act_i = int(act.item())
                             next_obs, r, done, info = cur_env.step(act_i)
 
@@ -654,7 +697,7 @@ def train_masked_ppo(
                             actions_buf.append(act_i)
                             logprobs_buf.append(float(lp.item()))
                             rewards_buf.append(r)
-                            values_buf.append(float(val.item()))
+                            values_buf.append(float(val.item()) * VALUE_TARGET_SCALE)
                             dones_buf.append(done)
                             dts_buf.append(float(info.get("dt", 0.5)))
 
@@ -673,57 +716,87 @@ def train_masked_ppo(
             b_actions = torch.tensor(actions_buf, dtype=torch.long, device=device)
             b_logprobs = torch.tensor(logprobs_buf, dtype=torch.float32, device=device)
             b_adv = torch.from_numpy(adv).to(device)
-            b_ret = torch.from_numpy(ret).to(device)
+            b_ret_scaled = torch.from_numpy(ret / VALUE_TARGET_SCALE).to(device)
 
-            # Warm-start the Value head on Update 1 after BC (even if bc_kl_coef==0) so an uncalibrated critic never shocks the Actor
-            if upd == 1 and bc_trained:
+            n_steps = len(actions_buf)
+            idxs = np.arange(n_steps)
+
+            # Critic-only warmup updates after BC / checkpoint resume so the detached Critic calibrates
+            # completely before the Actor takes a single gradient step!
+            is_critic_warmup = bc_trained and upd <= critic_warmup_updates
+            if is_critic_warmup:
                 model.train()
-                critic_opt = torch.optim.AdamW(model.value_head.parameters(), lr=1e-3)
-                n_steps_w = len(actions_buf)
-                idxs_w = np.arange(n_steps_w)
                 for _ in range(10):
-                    np.random.shuffle(idxs_w)
-                    for start in range(0, n_steps_w, minibatch_size):
-                        mb = idxs_w[start : start + minibatch_size]
+                    np.random.shuffle(idxs)
+                    for start in range(0, n_steps, minibatch_size):
+                        mb = idxs[start : start + minibatch_size]
                         _, val_pred = model.forward(b_states[mb], b_skills[mb], b_futures[mb], b_masks[mb])
-                        c_loss = 0.5 * ((val_pred - b_ret[mb]) ** 2).mean()
+                        c_loss = 0.5 * ((val_pred - b_ret_scaled[mb]) ** 2).mean()
                         critic_opt.zero_grad()
                         c_loss.backward()
-                        nn.utils.clip_grad_norm_(model.value_head.parameters(), 1.0)
+                        nn.utils.clip_grad_norm_(critic_params, 1.0)
                         critic_opt.step()
-                # Recompute calibrated values in minibatches (avoids GPU OOM on long multi-encounter rollouts)
-                cal_vals_list: list[float] = []
-                model.eval()
+                train_surv = (ep_survivals / episodes_per_update) * 100.0
+                mean_ret = float(np.mean(ep_returns))
                 with torch.no_grad():
-                    for start in range(0, n_steps_w, minibatch_size):
-                        end = min(n_steps_w, start + minibatch_size)
-                        _, v_mb = model.forward(b_states[start:end], b_skills[start:end], b_futures[start:end], b_masks[start:end])
-                        cal_vals_list.extend(v_mb.cpu().tolist())
-                adv, ret = _compute_gae(rewards_buf, cal_vals_list, dones_buf, dts_buf)
-                adv = (adv - adv.mean()) / (adv.std() + 1e-8)
-                b_adv = torch.from_numpy(adv).to(device)
-                b_ret = torch.from_numpy(ret).to(device)
+                    v_mse = 0.0
+                    v_cnt = 0
+                    for start in range(0, n_steps, minibatch_size):
+                        end = min(n_steps, start + minibatch_size)
+                        _, vp = model.forward(b_states[start:end], b_skills[start:end], b_futures[start:end], b_masks[start:end])
+                        v_mse += float(((vp - b_ret_scaled[start:end]) ** 2).sum().item())
+                        v_cnt += (end - start)
+                    v_rmse = (v_mse / max(1, v_cnt)) ** 0.5
+                print(
+                    f"[Upd {upd:3d}/{updates} CRITIC-WARMUP] train_surv={train_surv:5.1f}% ret={mean_ret:6.2f} "
+                    f"critic_rmse={v_rmse:.3f} ({round(time.perf_counter() - t_start, 1)}s)",
+                    flush=True,
+                )
+                history.append(
+                    {
+                        "update": upd,
+                        "phase": "critic_warmup",
+                        "train_survival_pct": round(train_surv, 1),
+                        "train_mean_return": round(mean_ret, 2),
+                        "critic_rmse": round(v_rmse, 4),
+                        "elapsed_s": round(time.perf_counter() - t_start, 1),
+                    }
+                )
+                continue
 
-            # Gentle KL decay spanning exact [1.0 -> 0.25] across updates
-            kl_progress = ((upd - 1) / max(1, updates - 1)) if updates > 1 else 0.0
+            # Gentle KL decay spanning exact [1.0 -> 0.25] across active actor updates
+            actor_upd = max(1, upd - (critic_warmup_updates if bc_trained else 0))
+            actor_total = max(1, updates - (critic_warmup_updates if bc_trained else 0))
+            kl_progress = ((actor_upd - 1) / max(1, actor_total - 1)) if actor_total > 1 else 0.0
             kl_scale = max(0.25, 1.0 - 0.75 * kl_progress)
             cur_kl_coef = bc_kl_coef * kl_scale
 
             model.train()
-            n_steps = len(actions_buf)
-            idxs = np.arange(n_steps)
+            early_stopped_kl = False
+            last_approx_kl = 0.0
             for _ in range(ppo_epochs):
                 np.random.shuffle(idxs)
+                epoch_kls: list[float] = []
                 for start in range(0, n_steps, minibatch_size):
                     mb = idxs[start : start + minibatch_size]
                     _, new_lp, entropy, new_val = model.get_action_and_value(
-                        b_states[mb], b_skills[mb], b_futures[mb], b_masks[mb], action=b_actions[mb]
+                        b_states[mb],
+                        b_skills[mb],
+                        b_futures[mb],
+                        b_masks[mb],
+                        action=b_actions[mb],
+                        temperature=rollout_temperature,
                     )
-                    ratio = (new_lp - b_logprobs[mb]).exp()
+                    logratio = new_lp - b_logprobs[mb]
+                    ratio = logratio.exp()
+                    with torch.no_grad():
+                        approx_kl = float(((ratio - 1.0) - logratio).mean().item())
+                        epoch_kls.append(approx_kl)
+
                     pg1 = -b_adv[mb] * ratio
                     pg2 = -b_adv[mb] * torch.clamp(ratio, 1.0 - clip_coef, 1.0 + clip_coef)
                     pg_loss = torch.max(pg1, pg2).mean()
-                    v_loss = 0.5 * ((new_val - b_ret[mb]) ** 2).mean()
+                    v_loss = 0.5 * ((new_val - b_ret_scaled[mb]) ** 2).mean()
                     kl_loss = torch.tensor(0.0, device=device)
                     if bc_anchor_model is not None and cur_kl_coef > 0.0:
                         with torch.no_grad():
@@ -738,12 +811,22 @@ def train_masked_ppo(
                             torch.zeros_like(cur_probs),
                         )
                         kl_loss = kl_terms.sum(dim=-1).mean()
-                    loss = pg_loss + vf_coef * v_loss - ent_coef * entropy.mean() + cur_kl_coef * kl_loss
 
-                    optimizer.zero_grad()
-                    loss.backward()
-                    nn.utils.clip_grad_norm_(model.parameters(), 0.5)
-                    optimizer.step()
+                    actor_loss = pg_loss - ent_coef * entropy.mean() + cur_kl_coef * kl_loss
+                    critic_loss = vf_coef * v_loss
+
+                    actor_opt.zero_grad()
+                    critic_opt.zero_grad()
+                    (actor_loss + critic_loss).backward()
+                    nn.utils.clip_grad_norm_(actor_params, 0.5)
+                    nn.utils.clip_grad_norm_(critic_params, 1.0)
+                    actor_opt.step()
+                    critic_opt.step()
+
+                last_approx_kl = float(np.mean(epoch_kls)) if epoch_kls else 0.0
+                if target_kl > 0.0 and last_approx_kl > target_kl:
+                    early_stopped_kl = True
+                    break
 
             train_surv = (ep_survivals / episodes_per_update) * 100.0
             mean_ret = float(np.mean(ep_returns))
@@ -751,16 +834,19 @@ def train_masked_ppo(
                 "update": upd,
                 "train_survival_pct": round(train_surv, 1),
                 "train_mean_return": round(mean_ret, 2),
+                "approx_kl": round(last_approx_kl, 4),
+                "early_stopped_kl": early_stopped_kl,
                 "elapsed_s": round(time.perf_counter() - t_start, 1),
             }
             history.append(row)
 
-            if upd == 1 or upd % max(1, updates // 12) == 0 or upd == updates:
+            eval_cadence = max(1, updates // 12)
+            if upd == (critic_warmup_updates + 1 if bc_trained else 1) or upd % eval_cadence == 0 or upd == updates:
                 ev, score = _evaluate_multi_gear(
                     model, kit, timeline, device, gear_conditioned, n_eval_pulls=8, extra_timelines=extras
                 )
                 print(
-                    f"[Upd {upd:3d}/{updates}] train_surv={train_surv:5.1f}% ret={mean_ret:6.2f} | "
+                    f"[Upd {upd:3d}/{updates}] train_surv={train_surv:5.1f}% ret={mean_ret:6.2f} kl={last_approx_kl:.4f} | "
                     f"eval_surv={ev['survival_rate_pct']:5.1f}% mg={ev.get('multi_gear_survival_pct', ev['survival_rate_pct']):5.1f}% "
                     f"filler={ev['mean_filler_gcds']:4.1f} gcd_heal={ev['mean_gcd_heals']:4.2f} "
                     f"oh={ev['mean_overheal_pct']:4.1f}% worst_party={ev['worst_party_hp_pct']:4.1f}% "
@@ -782,7 +868,7 @@ def train_masked_ppo(
                     )
             else:
                 print(
-                    f"[Upd {upd:3d}/{updates}] train_surv={train_surv:5.1f}% ret={mean_ret:6.2f} ({row['elapsed_s']}s)",
+                    f"[Upd {upd:3d}/{updates}] train_surv={train_surv:5.1f}% ret={mean_ret:6.2f} kl={last_approx_kl:.4f} ({row['elapsed_s']}s)",
                     flush=True,
                 )
     finally:
