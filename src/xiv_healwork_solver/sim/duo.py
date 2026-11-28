@@ -635,11 +635,12 @@ def stress_test_duo_plan(
     *,
     damage_roll: float = 1.05,
     n_phases: int = 12,
+    all_rolls: bool = True,
 ) -> DuoStressReport:
     """Verify an H1+H2 duo plan across all server-tick phases under worst-case damage roll."""
     rolls: tuple[float, ...] = (
         tuple(dict.fromkeys((0.95, 1.00, damage_roll)))
-        if timeline.hp_trigger_mechanics
+        if (all_rolls and timeline.hp_trigger_mechanics)
         else (damage_roll,)
     )
     total = n_phases * len(rolls)
@@ -733,13 +734,14 @@ def harden_duo_to_100pct(
     max_repairs: int = 90,
     min_hp_margin_ratio: float = 0.0,
     allowed_actors: tuple[str, ...] = ("h1", "h2"),
+    all_rolls: bool = True,
 ) -> tuple[OptimizationPlan, OptimizationPlan, DuoStressReport, int]:
     """Iteratively add the lowest combined-DPS-cost legal skill from `allowed_actors` until 100.0% survival
     (and optional `min_hp_margin_ratio` floor). Uses fast 2-phase screening before 12-phase certification!
     """
     cur1 = plan_h1.model_copy(deep=True)
     cur2 = plan_h2.model_copy(deep=True)
-    rep = stress_test_duo_plan(kit_h1, kit_h2, timeline, cur1, cur2, damage_roll=damage_roll, n_phases=n_phases)
+    rep = stress_test_duo_plan(kit_h1, kit_h2, timeline, cur1, cur2, damage_roll=damage_roll, n_phases=n_phases, all_rolls=all_rolls)
 
     def _goal_met(r: DuoStressReport) -> bool:
         if r.survival_rate_pct < 100.0:
@@ -800,7 +802,7 @@ def harden_duo_to_100pct(
 
         # Fast screen on the EXACT failing phase (`rep.worst_failure_phase`), then certify top-5 on all `n_phases`!
         shortlist: list[tuple[tuple[float, float, float, float], OptimizationPlan, OptimizationPlan]] = []
-        offsets = (1.5, 4.0, 8.0, 12.0) if not is_esuna else (4.0, 7.0)
+        offsets = (0.7, 1.8, 4.0, 8.0, 12.0) if not is_esuna else (4.0, 7.0)
         base_drops = rep.max_dropped_actions
         base_min_hp = min(rep.worst_min_hp_ratio.values())
         screen_phase = rep.worst_failure_phase if not margin_mode else 0.0
@@ -854,8 +856,9 @@ def harden_duo_to_100pct(
                     s_key = (1.0 if q_min >= min_hp_margin_ratio else 0.0, q_min, -pot_loss - sk.dps_cost * 10.0 - share_dev, 0.0)
                 else:
                     q_prog = (timeline.duration_s + 100.0) if q0.survived else (q0.first_death_time_s or 0.0)
-                    cleared = 1.0 if q_prog > fail_t + 0.5 else 0.0
-                    if cleared == 0.0 and q0.deficit_hp >= rep.worst_deficit_hp - 1_500.0:
+                    cleared = 2.0 if q_prog > fail_t + 0.5 else (1.0 if q_prog > fail_t + 0.02 else 0.0)
+                    min_def_gain = min(1_500.0, max(50.0, rep.worst_deficit_hp * 0.15))
+                    if cleared == 0.0 and q0.deficit_hp >= rep.worst_deficit_hp - min_def_gain:
                         continue
                     pot_loss = _effective_potency_loss(k_who, timeline, sk, cast_t)
                     share_dev = abs(q0.h1_effective_heal_share_pct - 50.0) * 0.25 if len(allowed_actors) > 1 else 0.0
@@ -867,8 +870,8 @@ def harden_duo_to_100pct(
         shortlist.sort(key=lambda x: x[0], reverse=True)
         best_choice: tuple[tuple[float, float, float, float], OptimizationPlan, OptimizationPlan, DuoStressReport] | None = None
         checked_full = 0
-        for s_key, t1, t2 in shortlist[:24]:
-            t_rep = stress_test_duo_plan(kit_h1, kit_h2, timeline, t1, t2, damage_roll=damage_roll, n_phases=n_phases)
+        for s_key, t1, t2 in shortlist[:10]:
+            t_rep = stress_test_duo_plan(kit_h1, kit_h2, timeline, t1, t2, damage_roll=damage_roll, n_phases=n_phases, all_rolls=all_rolls)
             if t_rep.max_dropped_actions > base_drops:
                 continue
             checked_full += 1
@@ -882,24 +885,29 @@ def harden_duo_to_100pct(
                     -abs(t_rep.mean_h1_heal_share_pct - 50.0) if len(allowed_actors) > 1 else 0.0,
                 )
             else:
+                min_def_gain = min(1_500.0, max(50.0, rep.worst_deficit_hp * 0.15))
                 improved = (
                     t_rep.survival_rate_pct > rep.survival_rate_pct
-                    or (t_rep.worst_failure_time_s is not None and t_rep.worst_failure_time_s > fail_t + 0.5)
+                    or (t_rep.worst_failure_time_s is not None and t_rep.worst_failure_time_s > fail_t + 0.02)
                     or (
                         t_rep.worst_failure_time_s is not None
-                        and abs(t_rep.worst_failure_time_s - fail_t) <= 0.5
-                        and t_rep.worst_deficit_hp < rep.worst_deficit_hp - 1_500.0
+                        and abs(t_rep.worst_failure_time_s - fail_t) <= 0.02
+                        and t_rep.worst_deficit_hp < rep.worst_deficit_hp - min_def_gain
                     )
                 )
                 if not improved:
                     continue
-                cleared_here = 1.0 if (t_rep.worst_failure_time_s is None or t_rep.worst_failure_time_s > fail_t + 0.5) else 0.0
+                cleared_here = (
+                    2.0
+                    if (t_rep.worst_failure_time_s is None or t_rep.worst_failure_time_s > fail_t + 0.5)
+                    else (1.0 if (t_rep.worst_failure_time_s is not None and t_rep.worst_failure_time_s > fail_t + 0.02) else 0.0)
+                )
                 prog_t = t_rep.worst_failure_time_s if t_rep.worst_failure_time_s is not None else (timeline.duration_s + 100.0)
                 key = (cleared_here, t_rep.survival_rate_pct, prog_t, t_rep.mean_combined_expected_potency)
             if best_choice is None or key > best_choice[0]:
                 best_choice = (key, t1, t2, t_rep)
-            # Early exit once we have evaluated >=5 clean candidates AND already cleared this failure point cleanly!
-            if checked_full >= 5 and best_choice is not None and best_choice[0][0] >= 1.0:
+            # Early exit once we have evaluated >=4 clean candidates AND already cleared this failure point cleanly!
+            if checked_full >= 4 and best_choice is not None and best_choice[0][0] >= 2.0:
                 break
 
         if best_choice is None:
@@ -1117,6 +1125,16 @@ def solve_duo_healwork(
         if strip_averaged_cohealer
         else timeline.model_copy(deep=True)
     )
+    # Do not waste long-CD (>=60s) prepull party shields when no party raidwide hits within the first 28s
+    # (e.g. Ultimate P1 openers where the first big party check is at 39-44s and needs Deploy ready!)
+    first_party_hit = min((e.time_s for e in duo_tl.events if e.target_scope == "party" and e.raw_damage >= 80_000.0), default=999.0)
+    if first_party_hit > 28.0:
+        def _hold_long_prepull(kit: PlayerKit) -> PlayerKit:
+            sk_cd = {s.id: s.cooldown_s for s in kit.skills}
+            kept = [pp for pp in kit.prepull_actions if not (pp.consumes_cooldown and sk_cd.get(pp.skill_id, 0.0) >= 60.0)]
+            return kit.model_copy(update={"prepull_actions": kept}) if len(kept) != len(kit.prepull_actions) else kit
+        kit_h1 = _hold_long_prepull(kit_h1)
+        kit_h2 = _hold_long_prepull(kit_h2)
 
     def _default_seed(kit: PlayerKit, extra: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
         if extra is not None:
@@ -1141,19 +1159,19 @@ def solve_duo_healwork(
 
     p1 = action_log_to_plan(kit_h1, duo_tl, _default_seed(kit_h1, seed_h1_actions), partner_trust=1.0, status="duo_seed")
     p2 = action_log_to_plan(kit_h2, duo_tl, _default_seed(kit_h2, seed_h2_actions), partner_trust=1.0, status="duo_seed")
-    # Stage 1: Fast coarse hardening (4 phases) -> Stage 2: Exact full-phase certification & polish (`n_phases`)
-    coarse_phases = min(4, n_phases)
+    # Stage 1: Fast coarse hardening (2 phases, single worst roll) -> Stage 2: Exact full-phase & all-roll certification (`n_phases`)
+    coarse_phases = min(2, n_phases)
     h1_plan, h2_plan, hrep, r_coarse = harden_duo_to_100pct(
         kit_h1, kit_h2, duo_tl, p1, p2,
         damage_roll=damage_roll, n_phases=coarse_phases, max_repairs=max_repairs,
-        min_hp_margin_ratio=min_hp_margin_ratio,
+        min_hp_margin_ratio=min_hp_margin_ratio, all_rolls=False,
     )
     repairs = r_coarse
-    if n_phases > coarse_phases:
+    if n_phases > coarse_phases or bool(duo_tl.hp_trigger_mechanics):
         h1_plan, h2_plan, hrep, r_fine = harden_duo_to_100pct(
             kit_h1, kit_h2, duo_tl, h1_plan, h2_plan,
-            damage_roll=damage_roll, n_phases=n_phases, max_repairs=max(12, max_repairs - r_coarse),
-            min_hp_margin_ratio=min_hp_margin_ratio,
+            damage_roll=damage_roll, n_phases=n_phases, max_repairs=max(20, max_repairs - r_coarse),
+            min_hp_margin_ratio=min_hp_margin_ratio, all_rolls=True,
         )
         repairs += r_fine
     if hrep.survival_rate_pct < 100.0:

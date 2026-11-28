@@ -10,7 +10,9 @@ from xiv_healwork_solver.models import (
     AutoAttackSegment,
     DamageEvent,
     DamageType,
+    DowntimeWindow,
     EncounterTimeline,
+    HpThresholdTrigger,
     PartnerActionProb,
     RoleType,
     WeaveOverrideWindow,
@@ -224,6 +226,10 @@ def extract_damage_timeline(
                 "damage_type": dmg_type,
                 "target_id": target_id,
                 "raw_damage": unmit,
+                "amount": float(ev.get("amount") or 0.0),
+                "absorbed": float(ev.get("absorbed") or 0.0),
+                "mitigated": float(ev.get("mitigated") or 0.0),
+                "overkill": float(ev.get("overkill") or 0.0),
             }
         )
 
@@ -278,8 +284,24 @@ def extract_damage_timeline(
                 continue
             scope = "party"
 
+        # Detect FFLogs HP-to-1 / invuln-surviving 9,999,999 mechanics (e.g. Nothingness, Beyond Death Antilight,
+        # Living Dead 11M Chaotic Holy where mitigated==0 and target survived in a 0-death clear)
+        is_set_hp1 = False
+        for x in cl:
+            if x["amount"] <= 0:
+                continue
+            if x["mitigated"] == 0.0 and x["raw_damage"] >= 9_000_000.0:
+                is_set_hp1 = True
+                break
+            is_nt = x["target_id"] is None or int(x["target_id"]) not in tank_slot_by_id
+            if is_nt and x["mitigated"] == 0.0 and x["raw_damage"] >= 500_000.0 and x["amount"] >= 150_000.0:
+                is_set_hp1 = True
+                break
+
         # Use true non-zero unmitigated hits from non-tank targets for party raidwides (avoids 100%-shielded zeros & tank armor bias)
-        if scope == "party":
+        if is_set_hp1:
+            avg_raw = 0.0
+        elif scope == "party":
             non_tank_unmit = [
                 x["raw_damage"]
                 for x in cl
@@ -288,7 +310,7 @@ def extract_damage_timeline(
             avg_raw = mean(non_tank_unmit) if non_tank_unmit else mean(x["raw_damage"] for x in cl)
         else:
             avg_raw = mean(x["raw_damage"] for x in cl)
-        hit_count = max(1, round(len(cl) / max(1, len(unique_targets))))
+        hit_count = 1 if is_set_hp1 else max(1, round(len(cl) / max(1, len(unique_targets))))
         first_t = cl[0]["time_s"]
         last_t = cl[-1]["time_s"]
         hit_interval = round((last_t - first_t) / (hit_count - 1), 2) if hit_count > 1 and last_t > first_t else 0.0
@@ -312,23 +334,25 @@ def extract_damage_timeline(
             ability_id=cl[0]["ability_id"],
             damage_type=cl[0]["damage_type"],
             target_scope=scope,  # type: ignore[arg-type]
-            raw_damage=round(avg_raw * hit_count, 1),
+            raw_damage=0.0 if is_set_hp1 else round(avg_raw * hit_count, 1),
             hit_count=hit_count,
             hit_interval_s=hit_interval,
             dot_total_damage=round(dot_per_target, 1),
+            mechanic_effect="set_hp_to_1" if is_set_hp1 else "normal",
         )
 
         # Merge simultaneous or alternating disjoint-target split-party mechanics (e.g. Group A hit then
         # Group B hit within 5.5s with ZERO overlapping targets across both tanks and non-tanks, and no DoT loss)
         # so the single `party` channel is never hit twice by mutually exclusive mechanics!
         merged_disjoint = False
-        if scope == "party" and nontank_targets and cand.dot_total_damage <= 0.0:
+        if scope == "party" and nontank_targets and cand.dot_total_damage <= 0.0 and cand.mechanic_effect == "normal":
             for prev_i in range(len(events) - 1, -1, -1):
                 prev_ev = events[prev_i]
                 if cand.time_s - prev_ev.time_s > 5.5:
                     break
                 if (
                     prev_ev.target_scope == "party"
+                    and prev_ev.mechanic_effect == "normal"
                     and event_nontank_targets[prev_i]
                     and event_all_targets[prev_i].isdisjoint(unique_targets)
                 ):
@@ -445,6 +469,109 @@ def extract_damage_timeline(
         events=events,
         auto_attacks=auto_attacks,
     )
+
+
+def extract_downtime_windows(
+    damage_done_events: list[dict[str, Any]],
+    fight_start_ms: float,
+    fight_end_ms: float,
+    min_gap_s: float = 6.0,
+) -> list[DowntimeWindow]:
+    """Infer untargetable / phase-transition windows from gaps in non-tick friendly DamageDone."""
+    hit_ts = sorted(
+        (float(ev["timestamp"]) - fight_start_ms) / 1000.0
+        for ev in damage_done_events
+        if ev.get("type") == "damage" and not ev.get("tick") and float(ev["timestamp"]) >= fight_start_ms
+    )
+    windows: list[DowntimeWindow] = []
+    dur_s = max(0.0, (fight_end_ms - fight_start_ms) / 1000.0)
+    idx = 0
+    for a, b in zip(hit_ts, hit_ts[1:]):
+        if b - a >= min_gap_s and b <= dur_s:
+            idx += 1
+            windows.append(
+                DowntimeWindow(
+                    start_s=round(a + 0.5, 2),
+                    end_s=round(b - 0.5, 2),
+                    name=f"Phase Transition {idx}",
+                    boss_targetable=False,
+                    party_can_act=True,
+                    clears_boss_debuffs=True,
+                )
+            )
+    return windows
+
+
+def extract_hp_threshold_triggers(
+    timeline: EncounterTimeline,
+    debuff_events: list[dict[str, Any]],
+    abilities_by_id: dict[int, dict[str, Any]],
+    fight_start_ms: float,
+) -> tuple[list[HpThresholdTrigger], list[str]]:
+    """Detect real full-heal-triggered raidwide debuffs (e.g. Dancing Mad 'Accretion' -> Earthquake).
+
+    Returns (triggers, replaced_event_ids) so static events already modeled dynamically aren't double-counted.
+    """
+    full_heal_debuff_names = {"accretion"}
+    applies: list[float] = []
+    removes: list[float] = []
+    for ev in debuff_events:
+        ab_name = str(abilities_by_id.get(int(ev.get("abilityGameID") or 0), {}).get("name", "")).lower()
+        if ab_name not in full_heal_debuff_names:
+            continue
+        t_s = (float(ev["timestamp"]) - fight_start_ms) / 1000.0
+        if ev.get("type") == "applydebuff":
+            applies.append(t_s)
+        elif ev.get("type") == "removedebuff":
+            removes.append(t_s)
+    if not applies:
+        return [], []
+
+    applies.sort()
+    removes.sort()
+    # Cluster apply windows separated by > 25s
+    clusters: list[list[float]] = []
+    for t in applies:
+        if not clusters or t - clusters[-1][-1] > 25.0:
+            clusters.append([t])
+        else:
+            clusters[-1].append(t)
+
+    triggers: list[HpThresholdTrigger] = []
+    replaced_ids: list[str] = []
+    for ci, cl in enumerate(clusters, start=1):
+        t_start = cl[0]
+        # Find removes belonging to this cluster (within 25s of apply)
+        cl_rems = [r for r in removes if t_start <= r <= t_start + 25.0]
+        t_end = max(cl_rems[-1] + 5.0, t_start + 18.0) if cl_rems else (t_start + 18.0)
+        # Match party raidwide events firing 0.5..3.5s after each remove (e.g. Earthquake after Accretion pops)
+        matched_evs = []
+        for r_t in cl_rems:
+            for e in timeline.events:
+                if e.target_scope == "party" and 0.4 <= (e.time_s - r_t) <= 3.5 and e.id not in replaced_ids:
+                    matched_evs.append(e)
+                    replaced_ids.append(e.id)
+                    break
+        if not matched_evs:
+            continue
+        blast_dmg = round(mean(e.raw_damage for e in matched_evs), 1)
+        triggers.append(
+            HpThresholdTrigger(
+                id=f"hp_trig_accretion_{ci}",
+                name=f"Accretion Full-Heal Trigger ({matched_evs[0].name})",
+                start_s=round(t_start, 2),
+                end_s=round(min(timeline.duration_s, t_end), 2),
+                watch_channel="party",
+                trigger_hp_ratio=0.999,
+                blast_target_scope="party",
+                blast_raw_damage=max(50_000.0, blast_dmg),
+                blast_damage_type=matched_evs[0].damage_type,
+                max_triggers=len(cl),
+                trigger_cooldown_s=4.5,
+                must_trigger_before_end=True,
+            )
+        )
+    return triggers, replaced_ids
 
 
 def extract_partner_probabilities(

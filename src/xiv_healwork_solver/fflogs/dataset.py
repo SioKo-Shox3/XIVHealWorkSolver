@@ -11,6 +11,8 @@ from xiv_healwork_solver.fflogs.curator import curate_fight_candidates
 from xiv_healwork_solver.fflogs.extractor import (
     _identify_tank_slots,
     extract_damage_timeline,
+    extract_downtime_windows,
+    extract_hp_threshold_triggers,
     extract_partner_healing_pulses,
     extract_partner_probabilities,
     extract_player_expert_actions,
@@ -150,6 +152,40 @@ def build_curated_encounter_timeline(
         abilities_by_id=abilities0,
         min_raw_damage=35_000.0,
     )
+    # Extract true untargetable phase transitions (downtimes) & full-heal HP trigger mechanics from canonical clear
+    try:
+        dmg_done0 = c.get_fight_events(
+            report_code=top.report_code,
+            fight_id=top.fight_id,
+            start_time=float(f0["startTime"]),
+            end_time=float(f0["endTime"]),
+            data_type="DamageDone",
+            hostility_type="Friendlies",
+        )
+        timeline.downtime_windows = extract_downtime_windows(
+            dmg_done0, float(f0["startTime"]), float(f0["endTime"]), min_gap_s=6.0
+        )
+    except Exception:
+        pass
+    try:
+        debuffs0 = c.get_fight_events(
+            report_code=top.report_code,
+            fight_id=top.fight_id,
+            start_time=float(f0["startTime"]),
+            end_time=float(f0["endTime"]),
+            data_type="Debuffs",
+            hostility_type="Friendlies",
+        )
+        triggers, replaced_ids = extract_hp_threshold_triggers(
+            timeline, debuffs0, abilities0, float(f0["startTime"])
+        )
+        if triggers:
+            timeline.hp_trigger_mechanics = triggers
+            if replaced_ids:
+                rep_set = set(replaced_ids)
+                timeline.events = [e for e in timeline.events if e.id not in rep_set]
+    except Exception:
+        pass
 
     # Extract partner / co-healer / tank cast & real healing streams across selected curated clears
     # Determine target_spec's actual tank slot (mt vs st) in the canonical fight `top`
@@ -246,11 +282,23 @@ def build_curated_encounter_timeline(
         known_skill_effects=known_skills,
         exclude_actor_names=exclude_names,
     )
-    # Strip heal_value and shield_value from cast-based partner probs since exact real Healing+Absorbed pulses cover both!
+    # Strip heal/shield from healer cast probs (covered by empirical Healing+Absorbed pulses),
+    # while preserving non-healer party shield skills (Divine Veil / Shake It Off / Tempera Grassa)
+    # so Mode A/B duo runs keep real Tank/DPS party shields after stripping averaged co-healer pulses!
     mit_only_probs = [
-        p.model_copy(update={"heal_value": 0.0, "shield_value": 0.0})
+        p.model_copy(
+            update={
+                "heal_value": 0.0,
+                "shield_value": 0.0 if (p.source_role == "healer" or p.target_channel != "party") else p.shield_value,
+            }
+        )
         for p in partner_probs
-        if (p.mitigation_all > 0 or p.mitigation_physical > 0 or p.mitigation_magical > 0)
+        if (
+            p.mitigation_all > 0
+            or p.mitigation_physical > 0
+            or p.mitigation_magical > 0
+            or (p.source_role != "healer" and p.target_channel == "party" and p.shield_value > 0)
+        )
     ]
     pet_names_by_spec: dict[str, set[str]] = {
         "scholar": {"eos", "seraph", "selene", "フェアリー・エオス", "セラフィム"},

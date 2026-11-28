@@ -18,6 +18,12 @@ skills:
   16160: {name: "タンク全体軽減 (90s)", role_slot: tank_party_90, target_channel: party, duration_s: 15.0, mitigation_magical: 0.10, mitigation_physical: 0.05}
   3540:  {name: "タンク全体バリア (90s)", role_slot: tank_party_shield, target_channel: party, duration_s: 30.0, shield_value: 20000, heal_value: 14000}
   7388:  {name: "タンク全体バリア (90s)", role_slot: tank_party_shield, target_channel: party, duration_s: 30.0, shield_value: 24000, heal_value: 14000}
+  7385:  {name: "パッセージ・オブ・アームズ", role_slot: tank_passage, target_channel: party, duration_s: 6.0, mitigation_all: 0.15}
+  # Tank Limit Break 3 (80% party mitigation, 8s — PLD/WAR/DRK/GNB)
+  199:   {name: "タンクLB3 (80%軽減)", role_slot: tank_lb3, target_channel: party, stack_group: tank_lb3, duration_s: 9.0, mitigation_all: 0.80}
+  4240:  {name: "タンクLB3 (80%軽減)", role_slot: tank_lb3, target_channel: party, stack_group: tank_lb3, duration_s: 9.0, mitigation_all: 0.80}
+  4241:  {name: "タンクLB3 (80%軽減)", role_slot: tank_lb3, target_channel: party, stack_group: tank_lb3, duration_s: 9.0, mitigation_all: 0.80}
+  17105: {name: "タンクLB3 (80%軽減)", role_slot: tank_lb3, target_channel: party, stack_group: tank_lb3, duration_s: 9.0, mitigation_all: 0.80}
 
   # Tank personal mitigations (aggregated across PLD/WAR/DRK/GNB per MT/ST slot!)
   7531:  {name: "ランパート", role_slot: tank_rampart, target_channel: mt, duration_s: 20.0, mitigation_all: 0.20}
@@ -36,10 +42,10 @@ skills:
   7382:  {name: "相方タンク投げバフ", role_slot: tank_external_mit, target_channel: st, duration_s: 8.0, mitigation_all: 0.20}
   16464: {name: "相方タンク投げバフ", role_slot: tank_external_mit, target_channel: st, duration_s: 8.0, mitigation_all: 0.19}
   # Tank Invulnerabilities (PLD Hallowed / WAR Holmgang / DRK Living Dead / GNB Superbolide)
-  30:    {name: "タンク無敵 (インビン/ホルム/リビデ/ボーライド)", role_slot: tank_invuln, target_channel: mt, stack_group: tank_invuln, duration_s: 10.0, mitigation_all: 0.92}
-  43:    {name: "タンク無敵 (インビン/ホルム/リビデ/ボーライド)", role_slot: tank_invuln, target_channel: mt, stack_group: tank_invuln, duration_s: 10.0, mitigation_all: 0.92}
-  3638:  {name: "タンク無敵 (インビン/ホルム/リビデ/ボーライド)", role_slot: tank_invuln, target_channel: mt, stack_group: tank_invuln, duration_s: 10.0, mitigation_all: 0.92}
-  16152: {name: "タンク無敵 (インビン/ホルム/リビデ/ボーライド)", role_slot: tank_invuln, target_channel: mt, stack_group: tank_invuln, duration_s: 10.0, mitigation_all: 0.92}
+  30:    {name: "タンク無敵 (インビン/ホルム/リビデ/ボーライド)", role_slot: tank_invuln, target_channel: mt, stack_group: tank_invuln, duration_s: 10.0, mitigation_all: 0.995}
+  43:    {name: "タンク無敵 (インビン/ホルム/リビデ/ボーライド)", role_slot: tank_invuln, target_channel: mt, stack_group: tank_invuln, duration_s: 10.0, mitigation_all: 0.995}
+  3638:  {name: "タンク無敵 (インビン/ホルム/リビデ/ボーライド)", role_slot: tank_invuln, target_channel: mt, stack_group: tank_invuln, duration_s: 10.0, mitigation_all: 0.995}
+  16152: {name: "タンク無敵 (インビン/ホルム/リビデ/ボーライド)", role_slot: tank_invuln, target_channel: mt, stack_group: tank_invuln, duration_s: 10.0, mitigation_all: 0.995}
 
   # Pure Healers (WHM / AST aggregated across jobs!)
   16536: {name: "ピュアヒラ10%全体軽減", role_slot: pure_healer_mit_10, target_channel: party, duration_s: 20.0, mitigation_all: 0.10}

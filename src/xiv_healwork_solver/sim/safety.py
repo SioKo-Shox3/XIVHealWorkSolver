@@ -343,8 +343,9 @@ def harden_plan_to_100pct(
                     fixed_tick_phase=0.0,
                     forced_damage_roll=damage_roll,
                 )
+                min_def_gain = min(1_500.0, max(50.0, report.worst_deficit_hp * 0.15))
                 if not quick.survived and quick.first_death_time_s is not None:
-                    if quick.first_death_time_s <= fail_t + 0.05 and quick.deficit_hp >= report.worst_deficit_hp - 500.0:
+                    if quick.first_death_time_s <= fail_t + 0.02 and quick.deficit_hp >= report.worst_deficit_hp - min_def_gain:
                         continue
 
                 trial_rep = stress_test_plan(kit, timeline, trial_plan, damage_roll=damage_roll, n_phases=n_phases)
@@ -352,12 +353,12 @@ def harden_plan_to_100pct(
                     trial_rep.survival_rate_pct > report.survival_rate_pct
                     or (
                         trial_rep.worst_failure_time_s is not None
-                        and trial_rep.worst_failure_time_s > fail_t + 0.5
+                        and trial_rep.worst_failure_time_s > fail_t + 0.02
                     )
                     or (
                         trial_rep.worst_failure_time_s is not None
-                        and abs(trial_rep.worst_failure_time_s - fail_t) <= 0.5
-                        and trial_rep.worst_deficit_hp < report.worst_deficit_hp - 2_000.0
+                        and abs(trial_rep.worst_failure_time_s - fail_t) <= 0.02
+                        and trial_rep.worst_deficit_hp < report.worst_deficit_hp - min_def_gain
                     )
                 )
                 if not improved:
