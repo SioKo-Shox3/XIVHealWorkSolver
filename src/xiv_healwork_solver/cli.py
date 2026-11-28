@@ -313,6 +313,88 @@ def audit_sheet(
         console.print(f"[green]Saved audit report -> {out}[/green]")
 
 
+@app.command("solve-with-partner")
+def solve_with_partner(
+    kit_path: Path = typer.Option(..., "--kit", "-k", help="Your PlayerKit YAML (e.g. scholar_heavyweight.yaml)"),
+    partner_kit_path: Path = typer.Option(..., "--partner-kit", help="Co-healer PlayerKit YAML (e.g. white_mage_heavyweight.yaml)"),
+    partner_sheet_path: Path = typer.Option(..., "--partner-sheet", help="Co-healer healwork sheet (.csv/.tsv/.json/.yaml)"),
+    timeline_path: Path = typer.Option(..., "--timeline", "-t", help="EncounterTimeline YAML"),
+    ilvl: Optional[int] = typer.Option(None, "--ilvl", help="Optional iLvl override (applied to both kits)"),
+    min_hp_margin: float = typer.Option(0.05, "--min-hp-margin", help="Target minimum worst-case HP ratio floor"),
+    out_dir: Optional[Path] = typer.Option(None, "--out-dir", "-o", help="Export verified sheet to directory"),
+) -> None:
+    """Mode A: Import your co-healer's exact healwork sheet and solve YOUR 100%-verified max-DPS healwork."""
+    from xiv_healwork_solver.sim.duo import export_duo_csv, export_duo_markdown
+    from xiv_healwork_solver.sim.partner_import import parse_partner_sheet, solve_with_partner_sheet
+    from xiv_healwork_solver.sim.safety import action_log_to_plan
+
+    my_kit = PlayerKit.from_yaml(kit_path).with_gear_overrides(ilvl=ilvl)
+    p_kit = PlayerKit.from_yaml(partner_kit_path).with_gear_overrides(ilvl=ilvl)
+    tl = EncounterTimeline.from_yaml(timeline_path)
+    p_actions = parse_partner_sheet(partner_sheet_path, p_kit)
+    plan, rep, duo_tl, stats = solve_with_partner_sheet(
+        my_kit, p_kit, tl, p_actions, min_hp_margin_ratio=min_hp_margin
+    )
+    ok = rep.survival_rate_pct >= 100.0 and rep.max_h2_dropped == 0 and rep.max_h1_dropped == 0
+    tag = "[bold green]Mode A VERIFIED[/bold green]" if ok else "[bold red]Mode A FAILED[/bold red]"
+    console.print(
+        f"{tag}: partner_casts={len(p_actions)} (partner_drop={rep.max_h1_dropped}) -> "
+        f"surv={rep.survival_rate_pct:.1f}% my_drop={rep.max_h2_dropped} "
+        f"myPot={rep.mean_h2_expected_potency:,.1f}p combEff={rep.mean_combined_dps_efficiency_pct:.2f}% "
+        f"share(P:Me)={rep.mean_h1_heal_share_pct:.1f}%:{rep.mean_h2_heal_share_pct:.1f}% "
+        f"myGCD={rep.mean_h2_gcd_heals:.1f} oh={rep.mean_h2_overheal_pct:.1f}% stats={stats}"
+    )
+    if out_dir is not None and ok:
+        out_dir.mkdir(parents=True, exist_ok=True)
+        p_plan = action_log_to_plan(p_kit, duo_tl, p_actions, partner_trust=1.0, status="imported_partner")
+        export_markdown(plan, out_dir / "my_plan.md")
+        export_csv(plan, out_dir / "my_plan.csv")
+        export_json(plan, out_dir / "my_plan.json")
+        export_duo_markdown(p_kit, my_kit, duo_tl, p_plan, plan, rep, out_dir / "combined_with_partner.md")
+        export_duo_csv(p_plan, plan, out_dir / "combined_with_partner.csv")
+        console.print(f"[bold]Exported[/bold] verified plans to {out_dir}")
+    if not ok:
+        raise typer.Exit(code=1)
+
+
+@app.command("solve-duo")
+def solve_duo(
+    h1_kit_path: Path = typer.Option(..., "--h1-kit", help="H1 PlayerKit YAML (e.g. white_mage_heavyweight.yaml)"),
+    h2_kit_path: Path = typer.Option(..., "--h2-kit", help="H2 PlayerKit YAML (e.g. scholar_heavyweight.yaml)"),
+    timeline_path: Path = typer.Option(..., "--timeline", "-t", help="EncounterTimeline YAML"),
+    ilvl: Optional[int] = typer.Option(None, "--ilvl", help="Optional iLvl override (e.g. 770 / 780 / 790)"),
+    min_hp_margin: float = typer.Option(0.05, "--min-hp-margin", help="Target minimum worst-case HP ratio floor"),
+    out_dir: Optional[Path] = typer.Option(None, "--out-dir", "-o", help="Export unified H1+H2 sheet (MD/CSV/JSON)"),
+) -> None:
+    """Mode B: Jointly co-optimize H1 + H2 healworks for 100% survival and maximum combined Expected DPS."""
+    from xiv_healwork_solver.sim.duo import export_duo_csv, export_duo_markdown, solve_duo_healwork
+
+    h1_kit = PlayerKit.from_yaml(h1_kit_path).with_gear_overrides(ilvl=ilvl)
+    h2_kit = PlayerKit.from_yaml(h2_kit_path).with_gear_overrides(ilvl=ilvl)
+    tl = EncounterTimeline.from_yaml(timeline_path)
+    p1, p2, rep, duo_tl, stats = solve_duo_healwork(
+        h1_kit, h2_kit, tl, min_hp_margin_ratio=min_hp_margin
+    )
+    ok = rep.survival_rate_pct >= 100.0 and rep.max_dropped_actions == 0
+    tag = "[bold green]Mode B Duo VERIFIED[/bold green]" if ok else "[bold red]Mode B Duo FAILED[/bold red]"
+    console.print(
+        f"{tag}: surv={rep.survival_rate_pct:.1f}% "
+        f"dropped=({rep.max_h1_dropped},{rep.max_h2_dropped}) "
+        f"combPot={rep.mean_combined_expected_potency:,.1f}p (eff={rep.mean_combined_dps_efficiency_pct:.2f}%) "
+        f"share(H1:H2)={rep.mean_h1_heal_share_pct:.1f}%:{rep.mean_h2_heal_share_pct:.1f}% "
+        f"gcdH=({rep.mean_h1_gcd_heals:.1f},{rep.mean_h2_gcd_heals:.1f}) oh={rep.mean_combined_overheal_pct:.1f}%"
+    )
+    if out_dir is not None and ok:
+        out_dir.mkdir(parents=True, exist_ok=True)
+        export_duo_markdown(h1_kit, h2_kit, duo_tl, p1, p2, rep, out_dir / "duo_plan.md")
+        export_duo_csv(p1, p2, out_dir / "duo_plan.csv")
+        export_json(p1, out_dir / "h1_plan.json")
+        export_json(p2, out_dir / "h2_plan.json")
+        console.print(f"[bold]Exported unified H1+H2 sheets[/bold] to {out_dir}")
+    if not ok:
+        raise typer.Exit(code=1)
+
+
 @app.command("check-fflogs")
 def check_fflogs() -> None:
     """Verify FFLogs API v2 credentials and display current hourly rate limit."""

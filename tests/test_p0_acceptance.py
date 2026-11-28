@@ -1457,6 +1457,94 @@ def test_multi_encounter_parallel_rl_trainer_smoke(tmp_path):
     assert (tmp_path / "rl_multi" / "best_policy.pt").exists()
 
 
+def test_mode_a_partner_sheet_import_and_mode_b_duo_cooptimization(tmp_path):
+    """Verify Mode A (CSV partner import with live CD enforcement) and Mode B (H1+H2 joint optimization),
+    plus Codex physics checks (Kardia H1/H2 symmetry, Benediction full-HP, Pneuma 0p loss, Taurochole stack_group, min_hp_margin).
+    """
+    from pathlib import Path
+    from xiv_healwork_solver.sim.duo import export_duo_markdown, replay_duo_plan, solve_duo_healwork
+    from xiv_healwork_solver.sim.partner_import import _parse_time_seconds, parse_partner_sheet, solve_with_partner_sheet
+    from xiv_healwork_solver.sim.safety import action_log_to_plan
+
+    repo_root = Path(__file__).resolve().parents[1]
+    whm = PlayerKit.from_yaml(repo_root / "data" / "kits" / "white_mage_heavyweight.yaml")
+    ast = PlayerKit.from_yaml(repo_root / "data" / "kits" / "astrologian_heavyweight.yaml")
+    sch = PlayerKit.from_yaml(repo_root / "data" / "kits" / "scholar_heavyweight.yaml")
+    sge = PlayerKit.from_yaml(repo_root / "data" / "kits" / "sage_heavyweight.yaml")
+
+    # 1) Physics regressions caught by Codex
+    assert _parse_time_seconds("-0:03") == pytest.approx(-3.0)
+    assert _parse_time_seconds(0) == pytest.approx(0.0)
+    pneuma = next(s for s in sge.skills if s.id == "pneuma")
+    macro = next(s for s in ast.skills if s.id == "macrocosmos")
+    tauro = next(s for s in sge.skills if s.id == "taurochole")
+    kera = next(s for s in sge.skills if s.id == "kerachole")
+    assert sge.expected_skill_potency_loss(pneuma, 40.0) == pytest.approx(0.0)
+    assert ast.expected_skill_potency_loss(macro, 40.0) == pytest.approx(0.0)
+    assert tauro.stack_group == kera.stack_group == "kerachole"
+
+    # Benediction restores a 280k Tank from 1 HP to 100% HP (clears Full-Heal Doom!)
+    tl_bene = EncounterTimeline(
+        encounter_name="Bene Tank Doom",
+        duration_s=20.0,
+        events=[
+            DamageEvent(
+                id="hp1", time_s=5.0, name="Tank HP1 Doom", target_scope="mt",
+                raw_damage=0.0, mechanic_effect="set_hp_to_1", doom_full_heal_duration_s=6.0,
+            )
+        ],
+    )
+    p_bene = action_log_to_plan(whm, tl_bene, [{"cast_at_s": 6.5, "skill_id": "benediction", "target_channel": "mt"}])
+    p_empty = action_log_to_plan(sch, tl_bene, [])
+    r_bene = replay_duo_plan(whm, sch, tl_bene, p_bene, p_empty, deterministic=True, fixed_tick_phase=1.5)
+    assert r_bene.survived is True and r_bene.h1_dropped_actions == 0
+
+    # H1 vs H2 Kardia healing attribution symmetry
+    tl_aa = EncounterTimeline(
+        encounter_name="Kardia Symmetry",
+        duration_s=15.0,
+        events=[DamageEvent(id="tb", time_s=4.0, name="Buster", target_scope="mt", raw_damage=120_000)],
+    )
+    r_sge_h1 = replay_duo_plan(sge, whm, tl_aa, action_log_to_plan(sge, tl_aa, []), action_log_to_plan(whm, tl_aa, []))
+    r_sge_h2 = replay_duo_plan(whm, sge, tl_aa, action_log_to_plan(whm, tl_aa, []), action_log_to_plan(sge, tl_aa, []))
+    assert r_sge_h1.h1_effective_heal_share_pct == pytest.approx(100.0)
+    assert r_sge_h2.h2_effective_heal_share_pct == pytest.approx(100.0)
+
+    # 2) Mode B: Joint WHM + SCH optimization on a lethal 2-hit raidwide timeline with 15% margin requirement
+    tl_duo = EncounterTimeline(
+        encounter_name="Duo Co-Opt Arena",
+        duration_s=45.0,
+        events=[
+            DamageEvent(id="rw1", time_s=12.0, name="Opening Blast", raw_damage=205_000),
+            DamageEvent(id="rw2", time_s=32.0, name="Follow-up Quake", raw_damage=215_000),
+        ],
+    )
+    p1, p2, drep, _, _ = solve_duo_healwork(
+        whm, sch, tl_duo, damage_roll=1.05, n_phases=6, min_hp_margin_ratio=0.15, strip_averaged_cohealer=False
+    )
+    assert drep.survival_rate_pct == 100.0
+    assert drep.max_dropped_actions == 0
+    assert min(drep.worst_min_hp_ratio.values()) >= 0.149
+    md = export_duo_markdown(whm, sch, tl_duo, p1, p2, drep)
+    assert "H1 + H2 ペア同時最適化ヒールワーク" in md
+
+    # 3) Mode A: Import WHM Japanese CSV sheet (including an illegal duplicate Temperance test + valid sheet test)
+    bad_csv = tmp_path / "bad_whm.csv"
+    bad_csv.write_text("時刻,スキル,対象\n00:08.00,テンパランス,party\n00:25.00,テンパランス,party\n", encoding="utf-8-sig")
+    bad_acts = parse_partner_sheet(bad_csv, whm)
+    _, bad_rep, _, bad_stats = solve_with_partner_sheet(sch, whm, tl_duo, bad_acts, damage_roll=1.05, n_phases=4)
+    assert bad_stats["partner_dropped"] >= 1  # Live DualHealerEngine catches illegal 17s duplicate Temperance!
+
+    good_csv = tmp_path / "good_whm.csv"
+    good_csv.write_text("時刻,スキル,対象\n00:09.00,テンパランス,party\n00:13.00,アサイラム,party\n00:30.00,リタージー・オブ・ベル,party\n", encoding="utf-8-sig")
+    good_acts = parse_partner_sheet(good_csv, whm)
+    my_plan, good_rep, _, good_stats = solve_with_partner_sheet(sch, whm, tl_duo, good_acts, damage_roll=1.05, n_phases=6)
+    assert good_rep.survival_rate_pct == 100.0
+    assert good_rep.max_h1_dropped == 0 and good_rep.max_h2_dropped == 0
+    assert len(my_plan.actions) >= 1
+
+
+
 
 
 

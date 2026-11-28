@@ -72,6 +72,7 @@ class _ActiveBuff:
     delayed_heal: float = 0.0
     delayed_trigger_ratio: float = 0.5
     delayed_triggered: bool = False
+    owner: str = "h1"  # "h1" | "h2" | "partner"
 
 
 @dataclass
@@ -495,8 +496,9 @@ class CombatEngine:
                 self._apply_heal(
                     b.target_channel,
                     b.delayed_heal,
-                    is_player_heal=(not b.skill_id.startswith("partner_")),
+                    is_player_heal=(b.owner != "partner" and not b.skill_id.startswith("partner_")),
                     single_channel_only=(b.target_channel != "party"),
+                    heal_owner=b.owner,
                 )
         self.active_buffs = kept_buffs
         self.active_dots = [d for d in self.active_dots if d.ticks_remaining > 0 and d.expires_at >= self.t - EPS]
@@ -533,12 +535,18 @@ class CombatEngine:
             else:
                 self.shields[ch].append(_ActiveShield(source_id, None, amount, exp))
 
+    def _record_heal_attribution(self, heal_owner: str, raw_total: float, eff: float) -> None:
+        if heal_owner == "h1":
+            self.stats["player_heal_raw"] += raw_total
+            self.stats["player_heal_eff"] += eff
+
     def _apply_heal(
         self,
         channel: str,
         amount: float,
         is_player_heal: bool = False,
         single_channel_only: bool = False,
+        heal_owner: str | None = None,
     ) -> float:
         if amount <= 0.0:
             return 0.0
@@ -596,9 +604,9 @@ class CombatEngine:
                                 self._apply_damage_to_channel(bch, b_raw, sp.blast_damage_type)
                         finally:
                             self._active_trigger_ids.discard(sp.id)
-        if is_player_heal:
-            self.stats["player_heal_raw"] += raw_total
-            self.stats["player_heal_eff"] += eff
+        eff_owner = heal_owner if heal_owner is not None else ("h1" if is_player_heal else "partner")
+        if eff_owner != "partner":
+            self._record_heal_attribution(eff_owner, raw_total, eff)
         return max(0.0, 1.0 - eff / max(1.0, raw_total))
 
     def active_hp_trigger_summary(self) -> tuple[int, float, float]:
@@ -726,6 +734,7 @@ class CombatEngine:
             if (
                 b.delayed_heal > 0.0
                 and not b.delayed_triggered
+                and b.delayed_trigger_ratio > 0.0
                 and b.expires_at >= self.t - EPS
                 and (b.target_channel == channel or b.target_channel == "party")
                 and (self.hp[channel] / self.max_hp[channel]) < b.delayed_trigger_ratio
@@ -734,8 +743,9 @@ class CombatEngine:
                 self._apply_heal(
                     channel,
                     b.delayed_heal,
-                    is_player_heal=(not b.skill_id.startswith("partner_")),
+                    is_player_heal=(b.owner != "partner" and not b.skill_id.startswith("partner_")),
                     single_channel_only=True,
+                    heal_owner=b.owner,
                 )
         return False
 
@@ -747,7 +757,9 @@ class CombatEngine:
         elif item.kind == "cast_resolve":
             sk: SkillDef = item.payload["skill"]
             ch: str = item.payload["channel"]
-            self._apply_skill_effects(sk, ch)
+            actor: str = str(item.payload.get("actor", "h1"))
+            h_scale: float | None = item.payload.get("heal_scale")
+            self._apply_skill_effects(sk, ch, owner=actor, heal_scale_override=h_scale)
 
         elif item.kind == "partner":
             pa = item.payload
@@ -762,6 +774,7 @@ class CombatEngine:
                         mit_all=pa.mitigation_all,
                         mit_phys=pa.mitigation_physical,
                         mit_mag=pa.mitigation_magical,
+                        owner="partner",
                     )
                 )
             if pa.shield_value > 0:
@@ -901,16 +914,24 @@ class CombatEngine:
                     self._apply_damage_to_channel(ch, seg.raw_damage_per_hit, seg.damage_type)
 
         elif item.kind == "server_tick":
-            # Natural Piety MP tick + active explicit MP regen buffs (e.g. Lucid Dreaming)
+            # Natural Piety MP tick + active explicit MP regen buffs (e.g. Lucid Dreaming) owned by h1
             if "mp" in self.resources:
                 mp_max = self.resolved_pools["mp"].maximum
-                extra_mp = sum(b.mp_per_tick for b in self.active_buffs if b.expires_at >= self.t - EPS and b.mp_per_tick > 0)
+                extra_mp = sum(
+                    b.mp_per_tick for b in self.active_buffs
+                    if b.expires_at >= self.t - EPS and b.mp_per_tick > 0 and b.owner == "h1"
+                )
                 self.resources["mp"] = min(mp_max, self.resources["mp"] + self.base_mp_per_3s_tick + extra_mp)
             # Active HoT ticks
             for b in self.active_buffs:
                 if b.expires_at >= self.t - EPS and b.hot_per_tick > 0:
-                    oh = self._apply_heal(b.target_channel, b.hot_per_tick, is_player_heal=(not b.skill_id.startswith("partner_")))
-                    if not b.skill_id.startswith("partner_"):
+                    oh = self._apply_heal(
+                        b.target_channel,
+                        b.hot_per_tick,
+                        is_player_heal=(b.owner != "partner" and not b.skill_id.startswith("partner_")),
+                        heal_owner=b.owner,
+                    )
+                    if b.owner == "h1" and not b.skill_id.startswith("partner_"):
                         self._step_reward_accum -= oh * 0.02
             # Automatic single-target pet/fairy heal (e.g. Eos Embrace) onto ONLY the single lowest-HP-ratio channel
             if self.kit.pet_auto_heal_per_3s_tick > 0:
@@ -921,6 +942,7 @@ class CombatEngine:
                         self.kit.pet_auto_heal_per_3s_tick * self.heal_scale,
                         is_player_heal=True,
                         single_channel_only=True,
+                        heal_owner="h1",
                     )
             # Partner baseline healing (co-healer GCD/short-CD healing & tank self-sustain from FFLogs)
             pbh = self.timeline.partner_baseline_healing
@@ -1031,10 +1053,18 @@ class CombatEngine:
                 max_p = max(max_p, mw.cast_interrupt_prob)
         return max_p
 
-    def _apply_skill_effects(self, sk: SkillDef, channel: str) -> None:
+    def _apply_skill_effects(
+        self,
+        sk: SkillDef,
+        channel: str,
+        *,
+        owner: str = "h1",
+        heal_scale_override: float | None = None,
+    ) -> None:
+        h_scale = self.heal_scale if heal_scale_override is None else heal_scale_override
         hot_ticks = max(1, int(round(sk.duration_s / 3.0))) if sk.duration_s >= 3.0 else 1
-        hot_per_tick = (sk.heal_hot_total * self.heal_scale) / hot_ticks if sk.heal_hot_total > 0 else 0.0
-        delayed_heal = sk.delayed_heal_value * self.heal_scale if sk.delayed_heal_value > 0 else 0.0
+        hot_per_tick = (sk.heal_hot_total * h_scale) / hot_ticks if sk.heal_hot_total > 0 else 0.0
+        delayed_heal = sk.delayed_heal_value * h_scale if sk.delayed_heal_value > 0 else 0.0
         if sk.duration_s > 0 and (
             sk.mitigation_all > 0
             or sk.mitigation_physical > 0
@@ -1056,6 +1086,7 @@ class CombatEngine:
                     mp_per_tick=sk.mp_regen_per_tick,
                     delayed_heal=delayed_heal,
                     delayed_trigger_ratio=sk.delayed_heal_trigger_ratio,
+                    owner=owner,
                 )
             )
         if sk.shield_max_hp_ratio > 0:
@@ -1073,17 +1104,24 @@ class CombatEngine:
         elif sk.shield_value > 0:
             self._add_shield(
                 channel,
-                sk.shield_value * self.heal_scale,
+                sk.shield_value * h_scale,
                 sk.effective_shield_duration(),
                 sk.id,
                 sk.shield_stack_group,
             )
-        if sk.heal_instant > 0:
-            overheal = self._apply_heal(channel, sk.heal_instant * self.heal_scale, is_player_heal=True)
-            self._step_reward_accum -= overheal * (0.15 if sk.is_gcd else 0.06)
+        if sk.heal_full_hp:
+            # Restores target(s) to 100% Max HP (e.g. Benediction on a 280k+ Tank from 1 HP)
+            targets = ("party", "mt", "st") if channel == "party" else (channel,)
+            for ch in targets:
+                self._apply_heal(ch, self.max_hp[ch], is_player_heal=True, single_channel_only=True, heal_owner=owner)
+        elif sk.heal_instant > 0:
+            overheal = self._apply_heal(channel, sk.heal_instant * h_scale, is_player_heal=True, heal_owner=owner)
+            if owner == "h1":
+                self._step_reward_accum -= overheal * (0.15 if sk.is_gcd else 0.06)
         if sk.cleanses_debuff:
             if self._apply_cleanse(channel):
-                self._step_reward_accum += 2.0
+                if owner == "h1":
+                    self._step_reward_accum += 2.0
 
     def action_mask(self) -> np.ndarray:
         """Return exact boolean legal-action mask at current timestamp `self.t`."""
@@ -1146,7 +1184,13 @@ class CombatEngine:
                 self.stats["mp_min"] = min(self.stats["mp_min"], self.resources["mp"])
             # Attack-triggered heals (e.g. Kardia) & gauges (e.g. Oath) fire ONLY on boss attack!
             if self.kit.on_attack_heal_target != "none" and self.kit.on_attack_heal_value > 0:
-                self._apply_heal(self.kit.on_attack_heal_target, self.kit.on_attack_heal_value * self.heal_scale)
+                self._apply_heal(
+                    self.kit.on_attack_heal_target,
+                    self.kit.on_attack_heal_value * self.heal_scale,
+                    is_player_heal=True,
+                    single_channel_only=True,
+                    heal_owner="h1",
+                )
             for rname, pool in self.resolved_pools.items():
                 if pool.gain_per_filler_gcd > 0:
                     self.resources[rname] = min(pool.maximum, self.resources.get(rname, 0.0) + pool.gain_per_filler_gcd)

@@ -163,6 +163,10 @@ class SkillDef(BaseModel):
         description="Shields sharing the same non-null group overwrite (e.g. 'gcd_barrier'); null stacks independently",
     )
     heal_instant: float = Field(default=0.0, ge=0.0)
+    heal_full_hp: bool = Field(
+        default=False,
+        description="If True, restores target to 100% Max HP (e.g. White Mage Benediction)",
+    )
     heal_hot_total: float = Field(default=0.0, ge=0.0)
     delayed_heal_value: float = Field(
         default=0.0,
@@ -187,10 +191,10 @@ class SkillDef(BaseModel):
     # Scheduling / ergonomic metadata
     lead_time_s: float = Field(default=1.5, ge=0.0)
     dps_cost: float = Field(default=0.05, ge=0.0)
-    direct_potency_loss: float = Field(
-        default=0.0,
+    direct_potency_loss: float | None = Field(
+        default=None,
         ge=0.0,
-        description="Optional direct potency loss override (e.g. special stance/channeling cost); 0 derives from GCD + resource potency",
+        description="Optional explicit potency loss override (e.g. 0.0 for DPS-neutral Pneuma/Macrocosmos); None derives from GCD + resource potency",
     )
     notes: str = ""
 
@@ -382,7 +386,7 @@ class PlayerKit(BaseModel):
             if rname in pool_map and pool_map[rname].dps_potency_per_unit > 0.0
         )
         gcd_loss = 0.0 if (is_free_downtime or not sk.is_gcd) else self.filler_gcd_potency
-        base_loss = sk.direct_potency_loss if sk.direct_potency_loss > 0.0 else (gcd_loss + res_loss)
+        base_loss = sk.direct_potency_loss if sk.direct_potency_loss is not None else (gcd_loss + res_loss)
         return round(base_loss * mult, 2)
 
     def weave_budget_at(self, time_s: float) -> int:

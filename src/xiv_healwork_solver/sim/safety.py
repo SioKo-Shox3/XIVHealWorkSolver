@@ -242,6 +242,7 @@ def _skill_helps_channel(sk: SkillDef, channel: str, kit: PlayerKit) -> tuple[bo
         or sk.shield_value > 0
         or sk.shield_max_hp_ratio > 0
         or sk.heal_instant > 0
+        or sk.heal_full_hp
         or sk.heal_hot_total > 0
         or sk.delayed_heal_value > 0
     )

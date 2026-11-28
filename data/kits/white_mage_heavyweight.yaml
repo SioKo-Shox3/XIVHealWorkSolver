@@ -1,0 +1,260 @@
+# Lv.100 White Mage (白魔道士) skill kit for AAC Heavyweight Savage (fully data-driven & editable)
+# Tune gcd_s, gear_stats.piety, reference_ilvl / max_hp_party to match your exact gear!
+label: "White Mage Lv.100 (2.40s GCD, PIE 600, 1 Raise Reserve)"
+role: healer
+reference_ilvl: 780
+gcd_s: 2.40
+base_weave_slots_per_gcd: 1
+burst_interval_s: 120.0
+burst_duration_s: 20.0
+burst_offset_s: 5.0
+burst_weave_slots_per_gcd: 1
+max_hp_party: 180000
+max_hp_tank: 280000
+tank_raidwide_damage_ratio: 0.62
+filler_gcd_potency: 340.0           # Glare III expected potency per attack GCD
+burst_dps_multiplier: 1.25          # 2-min party raid-buff multiplier
+
+gear_stats:
+  piety: 600
+  determination: 2500
+  spell_or_skill_speed: 1100
+  heal_scale_multiplier: 1.0
+  filler_gcd_mp_cost: 400.0         # Glare III = 400 MP / GCD
+  lucid_dreaming_mp_per_sec: 15.0   # Thin Air + Assize MP economy offset; Lucid & Assize also modeled explicitly
+  raise_mp_cost: 2400.0
+  planned_raise_reserve: 1
+
+prepull_actions:
+  - skill_id: divine_benison
+    offset_s: -3.0                  # Pre-pull MT Divine Benison (0 DPS loss, MP full)
+    target_channel: mt
+    consumes_cooldown: true
+
+resources:
+  - name: mp
+    initial: 10000
+    maximum: 10000
+    regen_per_sec: 66.7
+  - name: lily
+    initial: 0
+    maximum: 3
+    regen_per_sec: 0.05             # 1 Healing Lily every 20s (= 0.05/s); feeds Afflatus Misery (nearly DPS-neutral!)
+    dps_potency_per_unit: 0.0       # 3 Lilies + 1 Misery (1320p) vs 4 Glare III (1360p); burst-aligned Misery is DPS-neutral/positive!
+
+skills:
+  - id: temperance
+    name: "テンパランス"
+    action_id: 16536
+    cooldown_s: 120.0
+    duration_s: 20.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: party
+    mitigation_all: 0.10
+    lead_time_s: 2.0
+    dps_cost: 0.03
+
+  - id: divine_caress
+    name: "ディヴァインカレス"
+    action_id: 37011
+    cooldown_s: 120.0
+    duration_s: 15.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: party
+    shield_value: 22000             # Independent oGCD party barrier + HoT after Temperance
+    heal_hot_total: 16000
+    lead_time_s: 2.0
+    dps_cost: 0.03
+
+  - id: liturgy_of_the_bell
+    name: "リタージー・オブ・ベル"
+    action_id: 25862
+    cooldown_s: 180.0
+    duration_s: 20.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: party
+    heal_hot_total: 68000           # 5 stacks triggered across multi-hit / raidwide sequence
+    lead_time_s: 2.0
+    dps_cost: 0.04
+
+  - id: asylum
+    name: "アサイラム"
+    action_id: 3569
+    cooldown_s: 90.0
+    duration_s: 24.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: party
+    heal_hot_total: 42000           # 8 ticks + 10% healing received aura
+    lead_time_s: 1.5
+    dps_cost: 0.03
+
+  - id: assize
+    name: "アサイズ"
+    action_id: 3571
+    cooldown_s: 40.0
+    duration_s: 0.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: party
+    heal_instant: 22000
+    resource_grants:
+      mp: 500
+    lead_time_s: 0.5
+    dps_cost: 0.01                  # Core DPS + MP oGCD (used on cooldown!)
+
+  - id: plenary_indulgence
+    name: "インドゥルゲンティア"
+    action_id: 7433
+    cooldown_s: 60.0
+    duration_s: 10.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: party
+    mitigation_all: 0.0             # Adds ~200p bonus to AoE heals (modeled as instant/HoT boost)
+    heal_instant: 14000
+    lead_time_s: 1.0
+    dps_cost: 0.02
+
+  - id: afflatus_rapture
+    name: "ハート・オブ・ラプチャー"
+    action_id: 16534
+    cooldown_s: 2.4
+    duration_s: 0.0
+    is_gcd: true
+    weave_cost: 0
+    target_scope: party
+    heal_instant: 24000
+    resource_costs:
+      lily: 1
+    direct_potency_loss: 10.0       # Feeds Blood Lily -> Afflatus Misery (nearly 0p outside burst!)
+    lead_time_s: 0.5
+    dps_cost: 0.05
+
+  - id: afflatus_solace
+    name: "ハート・オブ・ソラス"
+    action_id: 16531
+    cooldown_s: 2.4
+    duration_s: 0.0
+    is_gcd: true
+    weave_cost: 0
+    target_scope: single_ally
+    heal_instant: 42000
+    resource_costs:
+      lily: 1
+    direct_potency_loss: 10.0       # Feeds Blood Lily -> Afflatus Misery
+    lead_time_s: 0.5
+    dps_cost: 0.06
+
+  - id: divine_benison
+    name: "ディヴァインベニゾン"
+    action_id: 7432
+    cooldown_s: 30.0
+    max_charges: 2
+    duration_s: 15.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: single_ally
+    shield_value: 26000
+    lead_time_s: 2.0
+    dps_cost: 0.02
+
+  - id: aquaveil
+    name: "アクアヴェール"
+    action_id: 25861
+    cooldown_s: 60.0
+    duration_s: 8.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: single_ally
+    mitigation_all: 0.15
+    lead_time_s: 2.0
+    dps_cost: 0.02
+
+  - id: tetragrammaton
+    name: "テトラグラマトン"
+    action_id: 3570
+    cooldown_s: 60.0
+    max_charges: 2
+    duration_s: 0.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: single_ally
+    heal_instant: 38000
+    lead_time_s: 0.5
+    dps_cost: 0.02
+
+  - id: benediction
+    name: "ベネディクション"
+    action_id: 140
+    cooldown_s: 180.0
+    duration_s: 0.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: single_ally
+    heal_full_hp: true
+    lead_time_s: 0.5
+    dps_cost: 0.04
+
+  - id: medica_iii
+    name: "メディガ"
+    action_id: 37010
+    cooldown_s: 2.4
+    duration_s: 15.0
+    cast_time_s: 2.0
+    slidecast_window_s: 0.5
+    is_gcd: true
+    weave_cost: 0
+    target_scope: party
+    heal_instant: 15000
+    heal_hot_total: 42000
+    resource_costs:
+      mp: 1000
+    lead_time_s: 2.5
+    dps_cost: 1.00
+
+  - id: cure_iii
+    name: "ケアルガ"
+    action_id: 131
+    cooldown_s: 2.4
+    duration_s: 0.0
+    cast_time_s: 2.0
+    slidecast_window_s: 0.5
+    is_gcd: true
+    weave_cost: 0
+    target_scope: party
+    heal_instant: 36000
+    resource_costs:
+      mp: 1500
+    lead_time_s: 2.5
+    dps_cost: 1.05
+
+  - id: lucid_dreaming
+    name: "ルーシッドドリーム"
+    action_id: 7562
+    cooldown_s: 60.0
+    duration_s: 21.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: party
+    mp_regen_per_tick: 550.0
+    lead_time_s: 1.0
+    dps_cost: 0.01
+
+  - id: esuna
+    name: "エスナ"
+    action_id: 7568
+    cooldown_s: 2.4
+    duration_s: 0.0
+    cast_time_s: 1.0
+    is_gcd: true
+    weave_cost: 0
+    target_scope: single_ally
+    cleanses_debuff: true
+    resource_costs:
+      mp: 400
+    lead_time_s: 1.0
+    dps_cost: 1.00

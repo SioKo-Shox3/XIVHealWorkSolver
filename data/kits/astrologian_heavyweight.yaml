@@ -1,0 +1,223 @@
+# Lv.100 Astrologian (占星術師) skill kit for AAC Heavyweight Savage (fully data-driven & editable)
+label: "Astrologian Lv.100 (2.40s GCD, PIE 600, 1 Raise Reserve)"
+role: healer
+reference_ilvl: 780
+gcd_s: 2.40
+base_weave_slots_per_gcd: 1
+burst_interval_s: 120.0
+burst_duration_s: 20.0
+burst_offset_s: 5.0
+burst_weave_slots_per_gcd: 1
+max_hp_party: 180000
+max_hp_tank: 280000
+tank_raidwide_damage_ratio: 0.62
+filler_gcd_potency: 270.0           # Fall Malefic expected potency per attack GCD
+burst_dps_multiplier: 1.25          # 2-min Divination + party raid-buff multiplier
+
+gear_stats:
+  piety: 600
+  determination: 2500
+  spell_or_skill_speed: 1100
+  heal_scale_multiplier: 1.0
+  filler_gcd_mp_cost: 400.0
+  lucid_dreaming_mp_per_sec: 30.0   # Umbral Draw (+2000 MP / 60s) passive MP recovery; Lucid modeled explicitly
+  raise_mp_cost: 2400.0
+  planned_raise_reserve: 1
+
+prepull_actions:
+  - skill_id: earthly_star
+    offset_s: -2.0                  # Pre-pull Earthly Star prep
+    target_channel: party
+    consumes_cooldown: true
+
+resources:
+  - name: mp
+    initial: 10000
+    maximum: 10000
+    regen_per_sec: 66.7
+
+skills:
+  - id: collective_unconscious
+    name: "運命の輪"
+    action_id: 3613
+    cooldown_s: 60.0
+    duration_s: 15.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: party
+    mitigation_all: 0.10
+    heal_hot_total: 26000
+    lead_time_s: 1.5
+    dps_cost: 0.03
+
+  - id: sun_sign
+    name: "サンサイン"
+    action_id: 37031
+    cooldown_s: 120.0
+    duration_s: 15.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: party
+    mitigation_all: 0.10
+    lead_time_s: 2.0
+    dps_cost: 0.03
+
+  - id: neutral_sect
+    name: "ニュートラルセクト"
+    action_id: 16559
+    cooldown_s: 120.0
+    duration_s: 20.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: party
+    shield_value: 20000
+    heal_hot_total: 20000
+    lead_time_s: 2.0
+    dps_cost: 0.04
+
+  - id: earthly_star
+    name: "アーサリースター"
+    action_id: 7439
+    cooldown_s: 60.0
+    duration_s: 10.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: party
+    heal_instant: 38000             # Giant Dominance burst heal + damage (0p DPS loss!)
+    lead_time_s: 2.0
+    dps_cost: 0.01
+
+  - id: macrocosmos
+    name: "マクロコスモス"
+    action_id: 25874
+    cooldown_s: 180.0
+    duration_s: 15.0
+    is_gcd: true
+    weave_cost: 0
+    target_scope: party
+    heal_instant: 60000             # Rewinds 50% of raidwide burst damage (0p DPS-neutral vs Fall Malefic!)
+    direct_potency_loss: 0.0
+    lead_time_s: 2.0
+    dps_cost: 0.03
+
+  - id: celestial_opposition
+    name: "星天対抗"
+    action_id: 16553
+    cooldown_s: 60.0
+    duration_s: 15.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: party
+    heal_instant: 12000
+    heal_hot_total: 26000
+    lead_time_s: 1.0
+    dps_cost: 0.02
+
+  - id: horoscope
+    name: "ホロスコープ"
+    action_id: 16557
+    cooldown_s: 60.0
+    duration_s: 10.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: party
+    heal_instant: 22000
+    lead_time_s: 1.5
+    dps_cost: 0.02
+
+  - id: lady_of_crowns
+    name: "クラウンレディ"
+    action_id: 7445
+    cooldown_s: 60.0
+    duration_s: 0.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: party
+    heal_instant: 22000
+    lead_time_s: 0.5
+    dps_cost: 0.02
+
+  - id: essential_dignity
+    name: "ディグニティ"
+    action_id: 3614
+    cooldown_s: 40.0
+    max_charges: 3
+    duration_s: 0.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: single_ally
+    heal_instant: 42000
+    lead_time_s: 0.5
+    dps_cost: 0.02
+
+  - id: exaltation
+    name: "エクザルテーション"
+    action_id: 25873
+    cooldown_s: 60.0
+    duration_s: 8.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: single_ally
+    mitigation_all: 0.10
+    delayed_heal_value: 28000
+    delayed_heal_trigger_ratio: 0.0   # Expiry-only heal at end of 8s Exaltation buff
+    lead_time_s: 2.0
+    dps_cost: 0.02
+
+  - id: celestial_intersection
+    name: "星天交差"
+    action_id: 16556
+    cooldown_s: 30.0
+    max_charges: 2
+    duration_s: 30.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: single_ally
+    shield_value: 20000
+    heal_instant: 12000
+    lead_time_s: 2.0
+    dps_cost: 0.02
+
+  - id: helios_conjunction
+    name: "コンジャンクション・ヘリオス"
+    action_id: 37030
+    cooldown_s: 2.4
+    duration_s: 15.0
+    cast_time_s: 1.5
+    slidecast_window_s: 0.5
+    is_gcd: true
+    weave_cost: 0
+    target_scope: party
+    heal_instant: 15000
+    heal_hot_total: 40000
+    resource_costs:
+      mp: 800
+    lead_time_s: 2.0
+    dps_cost: 1.00
+
+  - id: lucid_dreaming
+    name: "ルーシッドドリーム"
+    action_id: 7562
+    cooldown_s: 60.0
+    duration_s: 21.0
+    is_gcd: false
+    weave_cost: 1
+    target_scope: party
+    mp_regen_per_tick: 550.0
+    lead_time_s: 1.0
+    dps_cost: 0.01
+
+  - id: esuna
+    name: "エスナ"
+    action_id: 7568
+    cooldown_s: 2.4
+    duration_s: 0.0
+    cast_time_s: 1.0
+    is_gcd: true
+    weave_cost: 0
+    target_scope: single_ally
+    cleanses_debuff: true
+    resource_costs:
+      mp: 400
+    lead_time_s: 1.0
+    dps_cost: 1.00
